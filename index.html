@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ёлка 2027</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0b1a2a;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+        h1 { font-size: 28px; }
+    </style>
+</head>
+<body>
+    <div>
+        <h1>🎄 Ёлка 2027</h1>
+        <p id="status">Загрузка...</p>
+        <p id="user-name" style="color: #8ecae6;"></p>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        // Проверяем, открыто ли приложение внутри Telegram
+        const statusEl = document.getElementById('status');
+        const user = tg.initDataUnsafe?.user;
+
+        if (user) {
+            statusEl.textContent = 'Привет, это заглушка внутри Telegram!';
+            document.getElementById('user-name').textContent = `Пользователь: ${user.first_name || ''}`;
+        } else {
+            // Эта ветка сработает, если открыть ссылку в обычном браузере
+            statusEl.textContent = 'Страница открыта в браузере, а не в Telegram.';
+        }
+    </script>
+</body>
+</html>
