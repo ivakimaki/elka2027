@@ -38,8 +38,8 @@
         const user = tg.initDataUnsafe?.user;
 
         if (user) {
-            statusEl.textContent = 'Привет, это заглушка внутри Telegram!';
-            document.getElementById('user-name').textContent = `Пользователь: ${user.first_name || ''}`;
+            statusEl.textContent = 'Новогодняя ёлка готовится к празднику и ещё не появилась';
+            document.getElementById('user-name').textContent = `С наступающим, ${user.first_name || ''}`;
         } else {
             // Эта ветка сработает, если открыть ссылку в обычном браузере
             statusEl.textContent = 'Страница открыта в браузере, а не в Telegram.';
