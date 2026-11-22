@@ -338,7 +338,29 @@ const options = { auth:{ persistSession:false, autoRefreshToken:false, detectSes
 if(token){ options.global.headers.Authorization = 'Bearer '+token; options.accessToken = async function(){ return token; }; }
 return supabaseLib.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, options);
 }
-async function invokeFn(name,body){
+async function invokeFn(name, body) {
+  if (!sb) throw new Error('Supabase client is not initialized');
+
+  // ====== ЛОГ ДЛЯ TG-AUTH ======
+  if (name === 'tg-auth' && body && body.initData) {
+    const id = body.initData;
+    console.log('[ElkaBackend] === TG-AUTH REQUEST ===');
+    console.log('[ElkaBackend] initData length:', id.length);
+    console.log('[ElkaBackend] initData preview (first 150 chars):', id.slice(0, 150));
+    console.log('[ElkaBackend] initData preview (last 100 chars):', id.slice(-100));
+    console.log('[ElkaBackend] contains "hash=":', id.includes('hash='));
+    if (id.includes('hash=')) {
+      const hashStart = id.indexOf('hash=');
+      console.log('[ElkaBackend] hash value:', id.substring(hashStart, hashStart + 40));
+    }
+  }
+  // ====== КОНЕЦ ЛОГА ======
+
+  const options = { body: body || {} };
+  if (accessToken) options.headers = { Authorization: 'Bearer ' + accessToken };
+
+  const { data, error } = await sb.functions.invoke(name, options);
+  // ... остальной код без изменений
 if(!sb) throw new Error('Supabase client is not initialized');
 const options = { body: body||{} };
 if(accessToken) options.headers = { Authorization: 'Bearer '+accessToken };
