@@ -109,8 +109,30 @@ canvas { display:block; width:100%; height:100%; touch-action:none; }
 <!-- ===== ЭКРАННАЯ ДИАГНОСТИКА (вставить прямо перед </body>) ===== -->
 <!-- ===== ДИАГНОСТИКА v2 (с копированием и тестом) ===== -->
   <!-- ===== ДИАГНОСТИКА v3 (с показом initData) ===== -->
+<!-- ===== ДИАГНОСТИКА v4 (реальный тест + перехват логов) ===== -->
 <script>
 (function(){
+  // Буфер для перехвата console.*
+  var logBuffer = [];
+  var MAX_LOG_LINES = 30;
+  
+  function addLog(type, args) {
+    var line = '[' + type + '] ' + Array.from(args).map(function(a) {
+      try { return typeof a === 'object' ? JSON.stringify(a) : String(a); }
+      catch(e) { return String(a); }
+    }).join(' ');
+    logBuffer.push(line);
+    if (logBuffer.length > MAX_LOG_LINES) logBuffer.shift();
+  }
+  
+  // Перехватываем console.log/warn/error
+  var origLog = console.log;
+  var origWarn = console.warn;
+  var origError = console.error;
+  console.log = function() { addLog('LOG', arguments); origLog.apply(console, arguments); };
+  console.warn = function() { addLog('WARN', arguments); origWarn.apply(console, arguments); };
+  console.error = function() { addLog('ERROR', arguments); origError.apply(console, arguments); };
+  
   function collectDiag(){
     var L=[];
     L.push('=== ДИАГНОСТИКА ===');
@@ -140,6 +162,11 @@ canvas { display:block; width:100%; height:100%; touch-action:none; }
     L.push('Причина офлайна: '+(window.__elkaOfflineReason||'—'));
     if(window.__elkaOfflineError) L.push('Ошибка: '+window.__elkaOfflineError);
     if(window.__elkaTestResult){ L.push(''); L.push(window.__elkaTestResult); }
+    if(logBuffer.length > 0) {
+      L.push('');
+      L.push('=== КОНСОЛЬ (последние '+logBuffer.length+' строк) ===');
+      L.push(logBuffer.join('\n'));
+    }
     return L.join('\n');
   }
   function copyDiag(){
@@ -155,20 +182,43 @@ canvas { display:block; width:100%; height:100%; touch-action:none; }
     document.body.removeChild(ta); return ok;
   }
   function testTgAuth(){
+    var tg=window.Telegram&&window.Telegram.WebApp;
+    if(!tg || !tg.initData){
+      window.__elkaTestResult='--- ТЕСТ ОТМЕНЁН ---\nTelegram.WebApp.initData отсутствует (открыто вне Telegram или initData пустая)';
+      showPanel();
+      return;
+    }
+    var realInitData = tg.initData;
     var url=SUPABASE_URL+'/functions/v1/tg-auth';
-    var out=['--- ТЕСТ '+url+' ---'];
-    fetch(url,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY},body:JSON.stringify({initData:'test'})})
+    var out=['--- ТЕСТ С РЕАЛЬНЫМИ ДАННЫМИ ---'];
+    out.push('URL: '+url);
+    out.push('initData длина: '+realInitData.length);
+    out.push('Отправляю POST запрос...');
+    window.__elkaTestResult=out.join('\n');
+    showPanel();
+    
+    fetch(url,{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'apikey':SUPABASE_ANON_KEY,
+        'Authorization':'Bearer '+SUPABASE_ANON_KEY
+      },
+      body:JSON.stringify({initData:realInitData})
+    })
       .then(function(resp){
         out.push('HTTP статус: '+resp.status);
         return resp.text().then(function(t){
-          out.push('Ответ: '+t.slice(0,250));
-          if(resp.status===404) out.push('>>> ФУНКЦИЯ НЕ НАЙДЕНА.');
-          else out.push('>>> Функция ДОСТИЖИМА.');
+          out.push('Ответ: '+t.slice(0,300));
+          if(resp.status===200) out.push('>>> УСПЕХ! Функция отработала.');
+          else if(resp.status===404) out.push('>>> ФУНКЦИЯ НЕ НАЙДЕНА (404).');
+          else if(resp.status===500) out.push('>>> ОШИБКА СЕРВЕРА (500). Смотри логи в Dashboard.');
           window.__elkaTestResult=out.join('\n'); showPanel();
         });
       })
       .catch(function(e){
         out.push('Fetch-ошибка: '+(e&&e.message?e.message:e));
+        out.push('>>> Браузер ЗАБЛОКИРОВАЛ запрос (CORS или сеть).');
         window.__elkaTestResult=out.join('\n'); showPanel();
       });
   }
