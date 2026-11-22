@@ -106,6 +106,60 @@ canvas { display:block; width:100%; height:100%; touch-action:none; }
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
+     <!-- ===== ЭКРАННАЯ ДИАГНОСТИКА (без консоли) ===== -->
+<script>
+(function(){
+  const btn = document.createElement('button');
+  btn.textContent = '🔍';
+  btn.style.cssText = 'position:fixed;bottom:14px;right:14px;z-index:99998;width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(10,16,28,.92);color:#fde68a;font-size:19px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.5);';
+  document.body.appendChild(btn);
+
+  const panel = document.createElement('div');
+  panel.style.cssText = 'position:fixed;bottom:64px;right:14px;z-index:99998;max-width:300px;background:rgba(10,16,28,.97);border:1px solid rgba(250,204,21,.5);border-radius:12px;padding:10px;font-size:11px;line-height:1.5;color:#e2e8f0;display:none;white-space:pre-wrap;word-break:break-word;font-family:monospace;max-height:62vh;overflow-y:auto;';
+  document.body.appendChild(panel);
+
+  btn.onclick = () => {
+    const L = [];
+    L.push('=== ДИАГНОСТИКА ===');
+    L.push('URL: ' + location.href.slice(0, 70));
+    L.push('');
+    const tg = window.Telegram && window.Telegram.WebApp;
+    L.push('Telegram.WebApp: ' + (tg ? 'есть ✓' : 'НЕТ ✗ (открыто вне Telegram)'));
+    if (tg) {
+      L.push('initData: ' + (tg.initData ? 'есть (' + tg.initData.length + ' симв.)' : 'ПУСТАЯ ✗'));
+      const u = tg.initDataUnsafe;
+      L.push('user: ' + (u && u.user ? (u.user.id + ' / ' + (u.user.first_name||'')) : 'нет'));
+      L.push('start_param: ' + (u && u.start_param ? u.start_param : 'нет'));
+    }
+    L.push('');
+    L.push('SUPABASE_URL: ' + (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'не задан'));
+    L.push('ANON_KEY: ' + (typeof SUPABASE_ANON_KEY !== 'undefined'
+      ? (SUPABASE_ANON_KEY.indexOf('ВСТАВЬ') >= 0 ? 'НЕ ВСТАВЛЕН ✗ (плейсхолдер)' : 'вставлен (' + SUPABASE_ANON_KEY.length + ' симв.)')
+      : 'не задан'));
+    L.push('supabase SDK: ' + (window.supabase ? 'загружен ✓' : 'НЕ ЗАГРУЖЕН ✗'));
+    L.push('');
+    L.push('ElkaBackend: ' + (window.ElkaBackend ? 'есть' : 'НЕТ'));
+    if (window.ElkaBackend) {
+      const s = window.ElkaBackend.getState();
+      L.push('initialized: ' + s.initialized);
+      L.push('userId: ' + s.currentUserId);
+      L.push('accessToken: ' + s.accessTokenPresent);
+    }
+    if (window.__elkaOfflineReason) L.push('');
+    if (window.__elkaOfflineReason) L.push('Причина офлайна: ' + window.__elkaOfflineReason);
+    if (window.__elkaOfflineError) L.push('Ошибка: ' + window.__elkaOfflineError);
+    panel.textContent = L.join('\n');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  };
+
+  window.addEventListener('elka:backend-offline', (e) => {
+    window.__elkaOfflineReason = (e.detail && e.detail.reason) || 'unknown';
+    if (e.detail && e.detail.error) window.__elkaOfflineError = e.detail.error;
+    const st = document.getElementById('backendStatus');
+    if (st) { st.textContent = '⚪ Локально: ' + window.__elkaOfflineReason; st.className = 'backend-status off'; }
+  });
+})();
+</script>
 <body>
 <div id="app">
 <div class="backend-status hidden" id="backendStatus"></div>
