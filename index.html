@@ -108,6 +108,7 @@ canvas { display:block; width:100%; height:100%; touch-action:none; }
 </head>
 <!-- ===== ЭКРАННАЯ ДИАГНОСТИКА (вставить прямо перед </body>) ===== -->
 <!-- ===== ДИАГНОСТИКА v2 (с копированием и тестом) ===== -->
+  <!-- ===== ДИАГНОСТИКА v3 (с показом initData) ===== -->
 <script>
 (function(){
   function collectDiag(){
@@ -115,12 +116,22 @@ canvas { display:block; width:100%; height:100%; touch-action:none; }
     L.push('=== ДИАГНОСТИКА ===');
     L.push('URL: '+location.href.slice(0,70));
     var tg=window.Telegram&&window.Telegram.WebApp;
-    L.push('Telegram.WebApp: '+(tg?'есть':'НЕТ (вне Telegram)'));
+    L.push('Telegram.WebApp: '+(tg?'есть':'НЕТ'));
     if(tg){
-      L.push('initData: '+(tg.initData?'есть ('+tg.initData.length+' симв.)':'ПУСТАЯ'));
+      var id=tg.initData||'';
+      L.push('initData длина: '+id.length+' симв.');
+      L.push('initData начало: '+id.slice(0,120));
+      L.push('initData конец: '+id.slice(-120));
+      var hasHash=id.indexOf('hash=')>=0;
+      L.push('содержит hash=: '+(hasHash?'ДА':'НЕТ !!!'));
+      if(hasHash){
+        var hi=id.indexOf('hash=');
+        L.push('hash значение: '+id.substring(hi,hi+60));
+      }
       var u=tg.initDataUnsafe||{};
       L.push('user: '+(u.user?(u.user.id+' / '+(u.user.first_name||'')):'нет'));
     }
+    L.push('');
     L.push('SUPABASE_URL: '+(typeof SUPABASE_URL!=='undefined'?SUPABASE_URL:'не задан'));
     L.push('ANON_KEY: '+(typeof SUPABASE_ANON_KEY!=='undefined'?(String(SUPABASE_ANON_KEY).indexOf('ВСТАВЬ')>=0?'НЕ ВСТАВЛЕН':'вставлен ('+SUPABASE_ANON_KEY.length+' симв.)'):'не задан'));
     L.push('supabase SDK: '+(window.supabase?'загружен':'НЕ ЗАГРУЖЕН'));
@@ -133,7 +144,7 @@ canvas { display:block; width:100%; height:100%; touch-action:none; }
   }
   function copyDiag(){
     var txt=collectDiag();
-    var done=function(ok){ alert(ok?'Скопировано — вставь мне в чат':'Не вышло скопировать'); };
+    var done=function(ok){ alert(ok?'Скопировано':'Не вышло скопировать'); };
     if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(function(){done(true);},function(){done(fallbackCopy(txt));}); }
     else done(fallbackCopy(txt));
   }
@@ -151,14 +162,13 @@ canvas { display:block; width:100%; height:100%; touch-action:none; }
         out.push('HTTP статус: '+resp.status);
         return resp.text().then(function(t){
           out.push('Ответ: '+t.slice(0,250));
-          if(resp.status===404) out.push('>>> ФУНКЦИЯ НЕ НАЙДЕНА (404). Проверь, что tg-auth задеплоена и имя совпадает.');
-          else out.push('>>> Функция ДОСТИЖИМА, CORS в порядке. Проблема в логике/данных, а не в сети.');
+          if(resp.status===404) out.push('>>> ФУНКЦИЯ НЕ НАЙДЕНА.');
+          else out.push('>>> Функция ДОСТИЖИМА.');
           window.__elkaTestResult=out.join('\n'); showPanel();
         });
       })
       .catch(function(e){
         out.push('Fetch-ошибка: '+(e&&e.message?e.message:e));
-        out.push('>>> Браузер ЗАБЛОКИРОВАЛ запрос. Почти наверняка у функции нет CORS-заголовков, либо она не задеплоена.');
         window.__elkaTestResult=out.join('\n'); showPanel();
       });
   }
@@ -189,7 +199,7 @@ canvas { display:block; width:100%; height:100%; touch-action:none; }
     document.body.appendChild(wrap);
     var panel=document.createElement('pre');
     panel.id='__diagPanel';
-    panel.style.cssText='position:fixed;bottom:170px;right:14px;z-index:99998;max-width:320px;background:rgba(10,16,28,.98);border:1px solid rgba(250,204,21,.5);border-radius:12px;padding:10px;font-size:11px;line-height:1.5;color:#e2e8f0;display:none;white-space:pre-wrap;word-break:break-word;font-family:monospace;max-height:55vh;overflow-y:auto;margin:0;user-select:text;-webkit-user-select:text;';
+    panel.style.cssText='position:fixed;bottom:170px;right:14px;z-index:99998;max-width:320px;background:rgba(10,16,28,.98);border:1px solid rgba(250,204,21,.5);border-radius:12px;padding:10px;font-size:11px;line-height:1.4;color:#e2e8f0;display:none;white-space:pre-wrap;word-break:break-word;font-family:monospace;max-height:62vh;overflow-y:auto;margin:0;user-select:text;-webkit-user-select:text;';
     document.body.appendChild(panel);
     bMain.onclick=function(){ panel.textContent=collectDiag(); panel.style.display=panel.style.display==='none'?'block':'none'; };
     bCopy.onclick=copyDiag;
