@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Новогодняя Ёлка 2027 — v14.1</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+<div id="app">
+<canvas id="scene"></canvas>
+<div class="top-bar">
+<div class="stats-pill">
+<div class="stat-row"><span id="lblHeight">🌲 Ур.1 · 45 см</span></div>
+<div class="stat-row">
+<span id="lblLights" style="display:inline-flex;align-items:center;gap:3px;">
+<svg width="10" height="14" viewBox="0 0 12 16"><path d="M6 1 Q10 5 10 10 Q10 14 6 14 Q2 14 2 10 Q2 5 6 1 Z" fill="#f9e3b4" stroke="#fde68a" stroke-width="0.8"/><circle cx="6" cy="9" r="1.7" fill="#fffdf8"/></svg>
+<span id="lblLightsCount">4 огн.</span>
+</span>
+<span id="lblSparks">🔥 45</span>
+</div>
+<div class="progress-row" id="progRow">
+<div class="progress-bar"><div class="progress-fill" id="progFill"></div></div>
+<span class="progress-label" id="progLabel">0/6 до ур.2</span>
+</div>
+<div class="timer-sub" id="lblCountdown">До 2027: —</div>
+</div>
+<button class="guest-toggle" id="btnToggleGuest">👁 Вид гостя</button>
+</div>
+<div class="discount-badge hidden" id="discountBadge">🎅 −30% на ⭐ · <span class="timer" id="discountTimer">60:00</span></div>
+<div id="toast"></div>
+<div class="bottom-hud" id="ownerHud">
+<div class="action-row">
+<button class="btn btn-water" id="btnWater">💧 Полить</button>
+<button class="btn btn-share" id="btnOpenShare">🎁 Подарить ёлку</button>
+</div>
+<div class="tab-row">
+<button class="tab-btn" id="btnTabStar">⭐ <span id="starLvlBadge">ур.0</span></button>
+<button class="tab-btn" id="btnTabGarland">💡 Свет</button>
+<button class="tab-btn" id="btnTabFriends">🌲 Друзья</button>
+<button class="tab-btn" id="btnDailyGift">🎁 <span id="giftCdBadge">Готов!</span></button>
+</div>
+</div>
+<div class="bottom-hud" id="guestHud" style="display:none;">
+<div class="guest-banner" id="guestBanner">✨ Вы зашли на ёлку друга — ваш тёплый огонёк уже зажёгся на ветке!</div>
+<div class="action-row">
+<button class="btn btn-water" id="btnMyTree">🌲 Моя ёлка готова</button>
+<button class="btn btn-share" id="btnOpenGiftShop">🎁 Подарок (от 10 ⭐)</button>
+</div>
+</div>
+<div class="sheet" id="sheetStar">
+<div class="sheet-head"><span id="sheetStarTitle">⭐ 5-лучевая Звезда на макушку</span><button class="close-btn" data-close="sheetStar">✕</button></div>
+<div class="star-list" id="starList"></div>
+<div class="sub-label">Цвет звезды (скин)</div>
+<div class="color-grid" id="colorGrid"></div>
+</div>
+<div class="sheet" id="sheetGarland">
+<div class="sheet-head"><span>💡 Палитра гирлянды (за Искры 🔥)</span><button class="close-btn" data-close="sheetGarland">✕</button></div>
+<div class="pal-grid" id="palGrid"></div>
+</div>
+<div class="sheet" id="sheetGifts">
+<div class="sheet-head"><span>🎁 Поставить подарок под ёлку</span><button class="close-btn" data-close="sheetGifts">✕</button></div>
+<div class="daily-info" id="dailyGiftInfo"></div>
+<div class="gift-grid" id="giftGrid"></div>
+</div>
+<div class="sheet" id="sheetFriends">
+<div class="sheet-head"><span>🌲 Ёлки друзей</span><button class="close-btn" data-close="sheetFriends">✕</button></div>
+<div class="friends-carousel" id="friendsCarousel"></div>
+<div class="sub-label" style="margin-top:6px;">Заходи в гости, зажигай огоньки, дари подарки и звёзды</div>
+</div>
+<div class="sheet" id="sheetShare">
+<div class="sheet-head"><span>🎁 Подари другу ёлку</span><button class="close-btn" data-close="sheetShare">✕</button></div>
+<div class="share-value">Отправь ссылку — у друга появится собственная ёлка, а твой огонёк загорится у него на ветке. Это подарок, а не просьба 🎁</div>
+<div class="share-perks"><span>✨ Тебе за каждого гостя:</span><span class="share-perk-row">🔥 искры · 🌲 рост · 💡 огонёк</span></div>
+<div class="share-box" id="bioText">🎄 Зажги тёплый огонёк на моей ёлке 2027 → t.me/Elka2027Bot/app?startapp=u777</div>
+<div class="action-row">
+<button class="btn btn-share" id="btnCopyBio">📋 Скопировать ссылку</button>
+<button class="btn btn-water" id="btnSimVisit">✨ Симулировать визит</button>
+</div>
+<div class="share-motivate" id="shareMotivate"></div>
+</div>
+<div class="confirm-overlay hidden" id="confirmOverlay">
+<div class="confirm-wrap">
+<div class="confirm-gift" id="confirmGift"></div>
+<div class="confirm-card">
+<div class="confirm-title" id="confirmTitle"></div>
+<div class="confirm-desc" id="confirmDesc"></div>
+<input type="text" id="confirmInput" class="confirm-input" maxlength="40" placeholder="Подпись к подарку (до 40 символов)" style="display:none;">
+<div class="confirm-price" id="confirmPrice"></div>
+<div class="confirm-actions">
+<button class="btn btn-water" id="confirmCancel">Отмена</button>
+<button class="btn btn-share" id="confirmOk">Купить</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<script src="app.js"></script>
+<!-- Опционально: раскомментируй строку ниже, чтобы включить debug-панель -->
+<script src="debug.js"></script>
+</body>
+</html>
