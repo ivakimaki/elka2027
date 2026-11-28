@@ -1,5 +1,5 @@
 /* ============================================================
-КОНФИГИ И ОСНОВНОЙ КОД КЛИЕНТА v14.3
+КОНФИГИ И ОСНОВНОЙ КОД КЛИЕНТА v14.4
 ============================================================ */
 const CAM_TILT=0.18, MAX_LIGHTS=170;
 const TREE_LEVELS=[
@@ -30,6 +30,18 @@ function syncUI(){
   const lblH=document.getElementById("lblHeight"); if(lblH) lblH.textContent=`🌲 Ур.${state.treeLevel} · ${TREE_CONFIG.growthCm} см`;
   const lblS=document.getElementById("lblSparks"); if(lblS) lblS.textContent=`🔥 ${state.sparks}`;
   const lblL=document.getElementById("lblLightsCount"); if(lblL) lblL.textContent=`${LIGHT_CONFIG.count} огн.`;
+  const progFill=document.getElementById("progFill");
+  const progLabel=document.getElementById("progLabel");
+  const curLvlObj=TREE_LEVELS[Math.min(state.treeLevel-1, TREE_LEVELS.length-1)];
+  const nextNeed=curLvlObj.need;
+  if(progFill && progLabel && nextNeed!==Infinity){
+    const pct=Math.min(100, (state.warmth/nextNeed)*100);
+    progFill.style.width=pct+"%";
+    progLabel.textContent=`${state.warmth}/${nextNeed} до ур.${state.treeLevel+1}`;
+  } else if(progLabel) {
+    progLabel.textContent="Макс уровень";
+    if(progFill) progFill.style.width="100%";
+  }
 }
 
 async function doWater(){
@@ -73,11 +85,43 @@ resize();
 function renderScene(){
   ctx.fillStyle = "#0b1528";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#16a34a";
+  
+  const cx = canvas.width / 2;
+  const cy = canvas.height * 0.42;
+  const height = 300;
+  const tiers = 6;
+  
+  // Тонкий ствол
+  ctx.fillStyle = "#3d2817";
+  ctx.fillRect(cx - 8, cy, 16, height * 0.55);
+  
+  // Ярусы ёлки
+  for(let i = 0; i < tiers; i++){
+    const tierY = cy - height * 0.3 + (i * (height / tiers));
+    const tierW = 120 - (i * 15);
+    const tierH = height / (tiers - 1);
+    
+    ctx.fillStyle = i % 2 === 0 ? "#15803d" : "#16a34a";
+    ctx.beginPath();
+    ctx.moveTo(cx, tierY - tierH * 0.5);
+    ctx.lineTo(cx - tierW, tierY + tierH * 0.5);
+    ctx.lineTo(cx + tierW, tierY + tierH * 0.5);
+    ctx.closePath();
+    ctx.fill();
+  }
+  
+  // Звезда на макушке
+  ctx.fillStyle = "#fde047";
   ctx.beginPath();
-  ctx.moveTo(canvas.width / 2, canvas.height * 0.3);
-  ctx.lineTo(canvas.width / 2 - 80, canvas.height * 0.7);
-  ctx.lineTo(canvas.width / 2 + 80, canvas.height * 0.7);
+  const starX = cx, starY = cy - height * 0.35;
+  for(let s = 0; s < 5; s++){
+    const angle = (s * 4 * Math.PI) / 5 - Math.PI / 2;
+    const r = s === 0 ? 16 : 16;
+    const px = starX + Math.cos(angle) * r;
+    const py = starY + Math.sin(angle) * r;
+    if(s === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
   ctx.closePath();
   ctx.fill();
 }
