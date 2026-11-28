@@ -1,5 +1,5 @@
 /* ============================================================
-DEBUG PANEL + DIAG v4.2 (с подробным логированием бэкенда и состояния)
+DEBUG PANEL + DIAG v4.3 (с подробным логированием бэкенда, состояния и глобальных ошибок JS)
 Опциональный файл: если не подключён в index.html — ничего не ломается.
 ============================================================ */
 (function(){
@@ -16,6 +16,13 @@ DEBUG PANEL + DIAG v4.2 (с подробным логированием бэке
   console.log=function(){addLog('LOG',arguments);origLog.apply(console,arguments);};
   console.warn=function(){addLog('WARN',arguments);origWarn.apply(console,arguments);};
   console.error=function(){addLog('ERROR',arguments);origError.apply(console,arguments);};
+
+  window.addEventListener('error', function(e){
+    addLog('WIN_ERR', [e.message, e.filename ? (e.filename.split('/').pop()+':'+e.lineno+':'+e.colno) : '']);
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    addLog('PROMISE_ERR', [e.reason && e.reason.message ? e.reason.message : String(e.reason)]);
+  });
 
   var DEBUG_ENABLED=new URLSearchParams(location.search).has("debug");
   var panelOpen=false, tapCount=0, tapTimer=null;
@@ -83,7 +90,7 @@ DEBUG PANEL + DIAG v4.2 (с подробным логированием бэке
 
   function collectDiag(){
     var L=[];
-    L.push('=== ДИАГНОСТИКА v4.2 ===');
+    L.push('=== ДИАГНОСТИКА v4.3 ===');
     L.push('URL: '+location.href.slice(0,70));
     var tg=window.Telegram&&window.Telegram.WebApp;
     L.push('Telegram.WebApp: '+(tg?'есть':'НЕТ'));

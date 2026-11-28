@@ -127,7 +127,7 @@ return {
 sparks:state.sparks, starLevel:state.starLevel, starColor:state.starColor,
 unlockedPalettes:{...state.unlockedPalettes}, unlockedStarColors:{...state.unlockedStarColors},
 palette:LIGHT_CONFIG.palette, treeLevel:state.treeLevel, warmth:state.warmth, lightsCount:LIGHT_CONFIG.count,
-waterDay:state.waterDay, waterCount:state.waterCount,
+waterDay:state.waterDay, waterCount:state.waterCount, waterCdEnd:state.waterCdEnd,
 liveWaterDay:state.liveWaterDay, liveWaterCount:state.liveWaterCount,
 visitDay:state.visitDay, visitCount:state.visitCount, totalVisits:state.totalVisits,
 dailyLastDate:state.dailyLastDate, streakCount:state.streakCount,
@@ -154,6 +154,7 @@ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(cur)); }catch(e){}
 if(window.ElkaBackend && typeof window.ElkaBackend.flushSave==='function'){ window.ElkaBackend.flushSave().catch(e=>console.warn('Backend flushSave error',e)); }
 }
 function loadSave(){ try{ const r=localStorage.getItem(SAVE_KEY); return r?JSON.parse(r):null; }catch(e){ return null; } }
+function parseTs(v){ if(typeof v==='number') return v; if(typeof v==='string' && v){ const t=Date.parse(v); return isNaN(t)?0:t; } return 0; }
 (function(){
 const s=loadSave(); if(!s) return;
 if(typeof s.sparks==='number') state.sparks=s.sparks;
@@ -168,6 +169,7 @@ TREE_CONFIG.growthCm=TREE_LEVELS[state.treeLevel-1].heightCm;
 if(typeof s.lightsCount==='number') LIGHT_CONFIG.count=Math.max(1,Math.min(MAX_LIGHTS,s.lightsCount));
 if(typeof s.waterDay==='string') state.waterDay=s.waterDay;
 if(typeof s.waterCount==='number') state.waterCount=s.waterCount;
+if(s.waterCdEnd!==undefined) state.waterCdEnd=parseTs(s.waterCdEnd);
 if(typeof s.liveWaterDay==='string') state.liveWaterDay=s.liveWaterDay;
 if(typeof s.liveWaterCount==='number') state.liveWaterCount=s.liveWaterCount;
 if(typeof s.visitDay==='string') state.visitDay=s.visitDay;
@@ -177,7 +179,7 @@ if(typeof s.dailyLastDate==='string') state.dailyLastDate=s.dailyLastDate;
 if(typeof s.streakCount==='number') state.streakCount=s.streakCount;
 if(s.maxGrowthToast) state.maxGrowthToast=true;
 if(s.maxLightsToast) state.maxLightsToast=true;
-if(typeof s.discountEnd==='number') state.discountEnd=s.discountEnd;
+if(s.discountEnd!==undefined) state.discountEnd=parseTs(s.discountEnd);
 if(Array.isArray(s.groundGifts)) state.groundGifts=s.groundGifts;
 })();
 window.addEventListener("beforeunload",()=>flushSave(true));
@@ -194,18 +196,19 @@ hooks.applySnapshot = function(snap){
   if(snap.unlockedPalettes) state.unlockedPalettes=snap.unlockedPalettes;
   if(snap.palette && PALETTES[snap.palette]) LIGHT_CONFIG.palette=snap.palette;
   if(typeof snap.treeLevel==='number'){
-    state.treeLevel=snap.treeLevel;
+    state.treeLevel=Math.max(1,Math.min(TREE_LEVELS.length,snap.treeLevel));
     if(TREE_LEVELS[state.treeLevel-1]) TREE_CONFIG.growthCm=TREE_LEVELS[state.treeLevel-1].heightCm;
   }
   if(typeof snap.warmth==='number') state.warmth=snap.warmth;
-  if(typeof snap.lightsCount==='number') LIGHT_CONFIG.count=snap.lightsCount;
-  if(snap.waterDay!==undefined) state.waterDay=snap.waterDay;
+  if(typeof snap.lightsCount==='number') LIGHT_CONFIG.count=Math.max(1,Math.min(MAX_LIGHTS,snap.lightsCount));
+  if(snap.waterDay!==undefined) state.waterDay=snap.waterDay||"";
   if(typeof snap.waterCount==='number') state.waterCount=snap.waterCount;
-  if(snap.liveWaterDay!==undefined) state.liveWaterDay=snap.liveWaterDay;
+  if(snap.waterCdEnd!==undefined) state.waterCdEnd=parseTs(snap.waterCdEnd);
+  if(snap.liveWaterDay!==undefined) state.liveWaterDay=snap.liveWaterDay||"";
   if(typeof snap.liveWaterCount==='number') state.liveWaterCount=snap.liveWaterCount;
-  if(snap.dailyLastDate!==undefined) state.dailyLastDate=snap.dailyLastDate;
+  if(snap.dailyLastDate!==undefined) state.dailyLastDate=snap.dailyLastDate||"";
   if(typeof snap.streakCount==='number') state.streakCount=snap.streakCount;
-  if(snap.discountEnd!==undefined) state.discountEnd=snap.discountEnd;
+  if(snap.discountEnd!==undefined) state.discountEnd=parseTs(snap.discountEnd);
   if(Array.isArray(snap.groundGifts)) state.groundGifts=snap.groundGifts;
   lastSaved=snapshot();
   syncUI();
@@ -219,16 +222,17 @@ hooks.patchSnapshot = function(patch){
   if(patch.unlockedStarColors!==undefined){ state.unlockedStarColors=patch.unlockedStarColors; changed=true; }
   if(patch.palette!==undefined){ LIGHT_CONFIG.palette=patch.palette; changed=true; }
   if(patch.unlockedPalettes!==undefined){ state.unlockedPalettes=patch.unlockedPalettes; changed=true; }
-  if(patch.treeLevel!==undefined){ state.treeLevel=patch.treeLevel; TREE_CONFIG.growthCm=TREE_LEVELS[state.treeLevel-1].heightCm; changed=true; }
+  if(patch.treeLevel!==undefined){ state.treeLevel=Math.max(1,Math.min(TREE_LEVELS.length,patch.treeLevel)); TREE_CONFIG.growthCm=TREE_LEVELS[state.treeLevel-1].heightCm; changed=true; }
   if(patch.warmth!==undefined){ state.warmth=patch.warmth; changed=true; }
-  if(patch.lightsCount!==undefined){ LIGHT_CONFIG.count=patch.lightsCount; changed=true; }
-  if(patch.waterDay!==undefined){ state.waterDay=patch.waterDay; changed=true; }
+  if(patch.lightsCount!==undefined){ LIGHT_CONFIG.count=Math.max(1,Math.min(MAX_LIGHTS,patch.lightsCount)); changed=true; }
+  if(patch.waterDay!==undefined){ state.waterDay=patch.waterDay||""; changed=true; }
   if(patch.waterCount!==undefined){ state.waterCount=patch.waterCount; changed=true; }
-  if(patch.liveWaterDay!==undefined){ state.liveWaterDay=patch.liveWaterDay; changed=true; }
+  if(patch.waterCdEnd!==undefined){ state.waterCdEnd=parseTs(patch.waterCdEnd); changed=true; }
+  if(patch.liveWaterDay!==undefined){ state.liveWaterDay=patch.liveWaterDay||""; changed=true; }
   if(patch.liveWaterCount!==undefined){ state.liveWaterCount=patch.liveWaterCount; changed=true; }
-  if(patch.dailyLastDate!==undefined){ state.dailyLastDate=patch.dailyLastDate; changed=true; }
+  if(patch.dailyLastDate!==undefined){ state.dailyLastDate=patch.dailyLastDate||""; changed=true; }
   if(patch.streakCount!==undefined){ state.streakCount=patch.streakCount; changed=true; }
-  if(patch.discountEnd!==undefined){ state.discountEnd=patch.discountEnd; changed=true; }
+  if(patch.discountEnd!==undefined){ state.discountEnd=parseTs(patch.discountEnd); changed=true; }
   if(changed){
     lastSaved=snapshot();
     syncUI();
@@ -367,7 +371,7 @@ for(let i=screenGiftHitboxes.length-1;i>=0;i--){
 const hb=screenGiftHitboxes[i];
 if(Math.hypot(cx-hb.x,cy-hb.y)<=Math.max(26,hb.size)){
 if(state.isGuest) showToast(`🎁 Подарок «${hb.label}» под ёлкой (имя дарителя видит только хозяин)`,true);
-else { const msgLine=hb.message?`\n«${hb.message}»`:"; showToast(`🎁 Подарок «${hb.label}» от друга: ${hb.from}!${msgLine}`,true); }
+else { const msgLine=hb.message?`\n«${hb.message}»`:""; showToast(`🎁 Подарок «${hb.label}» от друга: ${hb.from}!${msgLine}`,true); }
 break;
 }
 }
@@ -610,7 +614,7 @@ const groundGlowR=Math.max(65,baseRadius*1.95*scale);
 const gGrad=ctx.createRadialGradient(cx,groundY+4,4,cx,groundY+4,groundGlowR);
 const litStrength=(0.06+LIGHT_CONFIG.treeLit*0.28)*Math.min(1,LIGHT_CONFIG.count/24);
 gGrad.addColorStop(0,`rgba(${pal[0].glow}, ${litStrength.toFixed(3)})`);
-grad.addColorStop(1,"rgba(14, 26, 46, 0)");
+gGrad.addColorStop(1,"rgba(14, 26, 46, 0)");
 ctx.fillStyle=gGrad;
 ctx.beginPath(); ctx.ellipse(cx,groundY+4,groundGlowR,groundGlowR*0.28,0,0,Math.PI*2); ctx.fill();
 const drawList=[];
@@ -852,6 +856,11 @@ const mins=Math.floor(left/60000);
 const secs=Math.floor((left%60000)/1000);
 document.getElementById("discountTimer").textContent=`${String(mins).padStart(2,"0")}:${String(secs).padStart(2,"0")}`;
 } else badge.classList.add("hidden");
+const bioEl=document.getElementById("bioText");
+if(bioEl && window.ElkaBackend && typeof window.ElkaBackend.getMyShareLink==='function'){
+const code=window.ElkaBackend.getMyShareLink();
+if(code) bioEl.textContent=`🎄 Зажги тёплый огонёк на моей ёлке 2027 → t.me/Elka2027Bot/app?startapp=${code}`;
+}
 refreshGiftPrices();
 updateShareMotivation();
 }
@@ -923,7 +932,7 @@ function getFriendsTrees(){
 const visited=loadVisitedTrees()||[];
 const byOwner=new Map();
 DEMO_FRIENDS.forEach(t=>byOwner.set(t.owner,{...t}));
-visited.forEach(v=>{ const base=byOwner.get(v.owner)||"{}"; byOwner.set(v.owner,{...base,...v}); });
+visited.forEach(v=>{ const base=byOwner.get(v.owner)||{}; byOwner.set(v.owner,{...base,...v}); });
 const arr=Array.from(byOwner.values());
 arr.sort((a,b)=>(b.lastVisit||0)-(a.lastVisit||0));
 return arr;
@@ -988,6 +997,7 @@ box.appendChild(card);
 async function doWater(){
 const now=Date.now();
 const wRem=waterRemaining();
+const backendReady=!!(window.ElkaBackend && typeof window.ElkaBackend.getState==='function' && window.ElkaBackend.getState().initialized);
 if(now<state.waterCdEnd || wRem<=0){
 const lRem=liveWaterRemaining();
 if(lRem<=0){ showToast("⚡ Лимит живой воды исчерпан (5). Возвращайтесь завтра!",true); return; }
@@ -999,7 +1009,7 @@ title:"⚡ Живая вода",
 desc:`Мгновенно, без ожидания отката:\n+${WATER_CONFIG.liveWarmth} к прогрессу роста, +${WATER_CONFIG.liveLights} огонька, +${WATER_CONFIG.liveSparks} 🔥.`,
 price:lwPrice, okText:"Купить",
 onOk:()=>{
-if(window.ElkaBackend && typeof window.ElkaBackend.buyLiveWater==='function'){
+if(backendReady && typeof window.ElkaBackend.buyLiveWater==='function'){
 window.ElkaBackend.buyLiveWater().catch(e=>showToast("Ошибка оплаты: "+e.message));
 } else {
 if(state.liveWaterDay!==todayStr()){ state.liveWaterDay=todayStr(); state.liveWaterCount=0; }
@@ -1017,14 +1027,23 @@ onCancel:()=>{}
 return;
 }
 
-if(window.ElkaBackend && typeof window.ElkaBackend.water==='function'){
+if(backendReady && typeof window.ElkaBackend.water==='function'){
+const prevLevel=state.treeLevel;
 try{
 const res = await window.ElkaBackend.water();
 if(res && res.user){
 spawnBurst(lastBaseScreen.x,lastBaseScreen.y-50,200);
+if(state.treeLevel>prevLevel){
+const lvl=TREE_LEVELS[state.treeLevel-1];
+showToast(`🎉 Уровень ${state.treeLevel}: «${lvl.name}»! Ёлка выросла до ${lvl.heightCm} см`,true);
+spawnBurst(lastApexScreen.x,lastApexScreen.y,48);
+spawnBurst(lastApexScreen.x+24,lastApexScreen.y+26,200);
+} else {
+showToast(`💧 +${WATER_CONFIG.lights} огонь, +${WATER_CONFIG.sparks} 🔥, прогресс +${WATER_CONFIG.warmth}`);
+}
 }
 }catch(e){
-console.warn('Backend water failed, fallback to local', e);
+console.warn('Backend water failed', e);
 }
 } else {
 if(state.waterDay!==todayStr()){ state.waterDay=todayStr(); state.waterCount=0; }
@@ -1065,10 +1084,10 @@ window.ElkaBackend.copyText(txt).then(ok=>showToast(ok?"📋 Скопирова�
 } else if(navigator.clipboard) navigator.clipboard.writeText(txt).then(()=>showToast("📋 Скопировано! Вставьте в Bio.",true)).catch(()=>{});
 });
 document.getElementById("btnSimVisit").addEventListener("click",async()=>{
-if(window.ElkaBackend && typeof window.ElkaBackend.CONFIG==='object' && window.ElkaBackend.CONFIG.USE_BACKEND){
+if(window.ElkaBackend && window.ElkaBackend.getState().initialized){
 const sh=window.ElkaBackend.getMyShareLink();
 const ownerId=sh?sh.replace(/^u/,''):null;
-if(ownerId && ownerId!==window.ElkaBackend.getState().currentUserId){
+if(ownerId && ownerId!==window.ElkaBackend.getState().currentUserId && /^\d+$/.test(ownerId)){
 try{
 await window.ElkaBackend.visit(ownerId);
 return;

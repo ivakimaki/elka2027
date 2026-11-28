@@ -1,5 +1,5 @@
 /* ============================================================
-SUPABASE BACKEND ADAPTER — v15.2
+SUPABASE BACKEND ADAPTER — v15.3
 ============================================================ */
 (function(){
 'use strict';
@@ -40,6 +40,7 @@ function todayYmd(){ return new Date().toISOString().slice(0,10); }
 function cloneJson(v){ return JSON.parse(JSON.stringify(v)); }
 function isSame(a,b){ return JSON.stringify(a)===JSON.stringify(b); }
 function dispatch(name,detail){ window.dispatchEvent(new CustomEvent(name,{detail})); }
+function parseTsMs(v){ if(!v) return 0; if(typeof v==='number') return v; const t=Date.parse(v); return isNaN(t)?0:t; }
 
 function createSupabaseClient(token){
   const options = { auth:{ persistSession:false, autoRefreshToken:false, detectSessionInUrl:false }, global:{ headers:{} } };
@@ -95,16 +96,17 @@ function rowToSnapshot(row, gifts){
     treeLevel: row.tree_level ?? 1,
     warmth: row.warmth ?? 0,
     lightsCount: row.lights_count ?? 4,
-    waterDay: row.water_day || null,
+    waterDay: row.water_day || '',
     waterCount: row.water_count ?? 0,
-    liveWaterDay: row.live_water_day || null,
+    waterCdEnd: parseTsMs(row.water_cd_end),
+    liveWaterDay: row.live_water_day || '',
     liveWaterCount: row.live_water_count ?? 0,
     visitDay: lo.visitDay || null,
     visitCount: lo.visitCount || 0,
     totalVisits: lo.totalVisits || 0,
-    dailyLastDate: row.daily_last_date || null,
+    dailyLastDate: row.daily_last_date || '',
     streakCount: row.streak_count ?? 0,
-    discountEnd: row.discount_end || null,
+    discountEnd: parseTsMs(row.discount_end),
     groundGifts: (gifts||[]).map(giftRowToGroundGift),
   };
 }
@@ -120,13 +122,14 @@ function rowToPatch(row){
   if(row.tree_level!==undefined) p.treeLevel=row.tree_level;
   if(row.warmth!==undefined) p.warmth=row.warmth;
   if(row.lights_count!==undefined) p.lightsCount=row.lights_count;
-  if(row.water_day!==undefined) p.waterDay=row.water_day;
+  if(row.water_day!==undefined) p.waterDay=row.water_day||'';
   if(row.water_count!==undefined) p.waterCount=row.water_count;
-  if(row.live_water_day!==undefined) p.liveWaterDay=row.live_water_day;
+  if(row.water_cd_end!==undefined) p.waterCdEnd=parseTsMs(row.water_cd_end);
+  if(row.live_water_day!==undefined) p.liveWaterDay=row.live_water_day||'';
   if(row.live_water_count!==undefined) p.liveWaterCount=row.live_water_count;
-  if(row.daily_last_date!==undefined) p.dailyLastDate=row.daily_last_date;
+  if(row.daily_last_date!==undefined) p.dailyLastDate=row.daily_last_date||'';
   if(row.streak_count!==undefined) p.streakCount=row.streak_count;
-  if(row.discount_end!==undefined) p.discountEnd=row.discount_end;
+  if(row.discount_end!==undefined) p.discountEnd=parseTsMs(row.discount_end);
   return p;
 }
 
@@ -141,7 +144,7 @@ function snapshotDiffToDbUpdate(diff){
   if(diff.warmth!==undefined) u.warmth=diff.warmth;
   if(diff.lightsCount!==undefined) u.lights_count=diff.lightsCount;
   if(diff.starLevel!==undefined && Number(diff.starLevel)<=2) u.star_level=diff.starLevel;
-  if(diff.dailyLastDate!==undefined) u.daily_last_date=diff.dailyLastDate;
+  if(diff.dailyLastDate!==undefined) u.daily_last_date=diff.dailyLastDate || null;
   if(diff.streakCount!==undefined) u.streak_count=diff.streakCount;
   return u;
 }
