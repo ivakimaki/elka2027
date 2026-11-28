@@ -181,15 +181,101 @@ function applyPatch(patch, meta){
   dispatch('elka:backend-patch',{patch,meta:meta||{}});
 }
 
+const ALLOWED_EVENTS = new Set([
+  'app_open','water','live_water','visit','daily_claim','santa_caught',
+  'gift_placed','gift_tapped','share_copied','invoice_paid',
+  'star_upgraded','palette_bought','star_color_bought','star_gift_sent'
+]);
+const pendingEvents = [];
+
+function trackEvent(eventName, payload){
+  if(!ALLOWED_EVENTS.has(eventName)){
+    warn('Unknown event ignored:', eventName);
+    return false;
+  }
+  if(pendingEvents.length >= 100) pendingEvents.shift();
+  pendingEvents.push({
+    event: eventName,
+    payload: payload && typeof payload === 'object' ? payload : {},
+  });
+  if(initialized && pendingEvents.length >= 10){
+    flushEvents().catch(e=>warn('auto flushEvents failed', e));
+  }
+  return true;
+}
+
+async function flushEvents(){
+  if(!initialized || !sb || !currentUserId || pendingEvents.length === 0) return;
+  const batch = pendingEvents.splice(0, pendingEvents.length).map(ev=>({
+    tg_id: currentUserId,
+    event: ev.event,
+    payload: ev.payload,
+  }));
+  try{
+    const { error } = await sb.from('events').insert(batch);
+    if(error) warn('events insert failed:', error);
+    else log('events flushed:', batch.length);
+  }catch(e){
+    warn('events insert exception:', e);
+  }
+}
+
+function collectEventsFromDiff(prev, cur, diff){
+  if(!prev || !cur || !diff) return;
+  if(diff.dailyLastDate && cur.dailyLastDate && cur.dailyLastDate !== prev.dailyLastDate){
+    trackEvent('daily_claim', { streak_count: cur.streakCount || 0 });
+  }
+  if(diff.unlockedPalettes && cur.unlockedPalettes){
+    const prevPal = prev.unlockedPalettes || {};
+    Object.keys(cur.unlockedPalettes).forEach(k=>{
+      if(cur.unlockedPalettes[k] && !prevPal[k]) trackEvent('palette_bought', { palette: k });
+    });
+  }
+  if(diff.unlockedStarColors && cur.unlockedStarColors){
+    const prevCol = prev.unlockedStarColors || {};
+    Object.keys(cur.unlockedStarColors).forEach(k=>{
+      if(cur.unlockedStarColors[k] && !prevCol[k]) trackEvent('star_color_bought', { color: k });
+    });
+  }
+  if(diff.starLevel !== undefined && Number(cur.starLevel) > Number(prev.starLevel || 0) && Number(cur.starLevel) <= 2){
+    trackEvent('star_upgraded', { level: Number(cur.starLevel), currency: 'sparks' });
+  }
+  if(diff.discountEnd && Number(cur.discountEnd) > Number(prev.discountEnd || 0)){
+    trackEvent('santa_caught', { discount_end: cur.discountEnd });
+  }
+}
+
+async function attachDonorNames(giftRows){
+  if(!Array.isArray(giftRows) || giftRows.length === 0) return [];
+  const donorIds = Array.from(new Set(giftRows.map(g=>g.donor_id).filter(Boolean).map(String)));
+  const nameMap = new Map();
+  if(donorIds.length > 0){
+    try{
+      const previews = await getTreesPreview(donorIds);
+      (previews || []).forEach(p=>{
+        if(p && p.tg_id) nameMap.set(String(p.tg_id), p.first_name || 'Друг');
+      });
+    }catch(e){
+      warn('attachDonorNames failed:', e);
+    }
+  }
+  return giftRows.map(g=>{
+    const name = g.donor_id ? nameMap.get(String(g.donor_id)) : null;
+    return Object.assign({}, g, { donor_name: name || g.donor_name || 'Друг' });
+  });
+}
+
 const SupabaseAdapter = {
   async load(){
     if(!currentUserId) return null;
-    const { data:row, error:ue } = await sb.from('users').select('*').eq('tg_id',currentUserId).single();
+    const { data:row, error:ue } = await sb.from('users').select('*').eq('tg_id',currentUserId).maybeSingle();
     if(ue) throw ue;
+    if(!row) throw new Error('User row not found');
     const { data:gifts, error:ge } = await sb.from('gifts').select('id,kind,message,donor_id,created_at,price_paid').eq('owner_id',currentUserId).order('created_at',{ascending:true});
     if(ge) throw ge;
+    const enrichedGifts = await attachDonorNames(gifts || []);
     currentUserRow = row;
-    const snap = rowToSnapshot(row, gifts||[]);
+    const snap = rowToSnapshot(row, enrichedGifts);
     lastServerSnapshot = cloneJson(snap);
     return snap;
   },
@@ -251,12 +337,16 @@ async function flushSave(){
   if(!initialized) return;
   if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
   const cur = typeof hooks.getSnapshot==='function' ? hooks.getSnapshot() : null;
-  if(!cur) return;
-  writeLocalOnlyFieldsFromSnapshot(cur);
-  const diff = diffSnapshots(lastServerSnapshot, cur);
-  if(!diff || Object.keys(diff).length===0) return;
-  await SupabaseAdapter.save(diff);
-  lastServerSnapshot = cloneJson(cur);
+  if(cur){
+    writeLocalOnlyFieldsFromSnapshot(cur);
+    const diff = diffSnapshots(lastServerSnapshot, cur);
+    if(diff && Object.keys(diff).length>0){
+      collectEventsFromDiff(lastServerSnapshot, cur, diff);
+      await SupabaseAdapter.save(diff);
+      lastServerSnapshot = cloneJson(cur);
+    }
+  }
+  await flushEvents();
 }
 
 function installFlushHooks(){
@@ -275,11 +365,14 @@ function getStartParam(){
 
 async function parseOwnerIdFromStartParam(sp){
   if(!sp) return null;
+  sp = String(sp).trim();
   if(/^\d+$/.test(sp)) return sp;
   if(/^[a-zA-Z0-9]{4,10}$/.test(sp)){
-    const { data, error } = await sb.from('users').select('tg_id').eq('invite_code', sp).single();
-    if(error || !data){ warn('Invite code not found:', sp); return null; }
-    return data.tg_id;
+    const { data, error } = await sb.rpc('resolve_invite_code', { code: sp });
+    if(!error && data) return String(data);
+    if(/^u\d+$/.test(sp)) return sp.slice(1);
+    warn('Invite code not found:', sp, error);
+    return null;
   }
   return null;
 }
@@ -291,7 +384,14 @@ async function autoVisitFromStartParam(){
   if(!currentUserId) return null;
   if(String(ownerId)===String(currentUserId)) return null;
   const lockKey='elka_2027_auto_visit_'+currentUserId+'_'+ownerId+'_'+todayYmd();
-  if(sessionStorage.getItem(lockKey)==='1'){ log('auto visit already attempted'); return null; }
+  if(sessionStorage.getItem(lockKey)==='1'){
+    log('auto visit already attempted');
+    try{
+      const publicTree = await getPublicTree(ownerId);
+      if(publicTree) dispatch('elka:guest-tree', { publicTree, source:'start_param', startParam:sp });
+    }catch(e){ warn('guest tree load failed', e); }
+    return null;
+  }
   sessionStorage.setItem(lockKey,'1');
   return visit(ownerId,{ source:'start_param', startParam:sp });
 }
@@ -304,8 +404,16 @@ async function visit(ownerId, meta){
   log('do-visit',ownerId);
   const data = await invokeFn('do-visit',{ owner_id:ownerId });
   if(data && data.visitor) applyPatch(rowToPatch(data.visitor),{ source:'do-visit:visitor' });
-  if(typeof hooks.onVisitResult==='function') hooks.onVisitResult(data,meta||{});
-  dispatch('elka:visit-result',{result:data,meta:meta||{}});
+  let publicTree = null;
+  try{
+    publicTree = await getPublicTree(ownerId);
+  }catch(e){
+    warn('getPublicTree after visit failed:', e);
+  }
+  const visitMeta = Object.assign({}, meta||{}, { publicTree });
+  if(typeof hooks.onVisitResult==='function') hooks.onVisitResult(data, visitMeta);
+  dispatch('elka:visit-result',{ result:data, publicTree, meta:visitMeta });
+  if(publicTree) dispatch('elka:guest-tree', { publicTree, source:visitMeta.source||'visit' });
   if(data.lit) toast('Огонёк зажжён ✨'); else toast('Тёплый визит +2 🔥');
   return data;
 }
@@ -377,19 +485,55 @@ async function buyLiveWater(){
 }
 
 async function getDonorIds(){
-  if(!initialized || !currentUserId) return [];
+  if(!sb || !currentUserId) return [];
   const { data,error } = await sb.from('gifts').select('donor_id').eq('owner_id',currentUserId);
   if(error) throw error;
   return Array.from(new Set((data||[]).map(x=>x.donor_id).filter(Boolean)));
 }
 
 async function getTreesPreview(ids){
-  if(!initialized) return [];
+  if(!sb) return [];
   const uniq = Array.from(new Set((ids||[]).map(String).filter(Boolean)));
   if(uniq.length===0) return [];
   const { data,error } = await sb.rpc('get_trees_preview',{ ids:uniq });
   if(error) throw error;
   return data||[];
+}
+
+async function getPublicTree(ownerId){
+  if(!sb || !ownerId) return null;
+  const id = String(ownerId).trim();
+  if(!id) return null;
+  const previews = await getTreesPreview([id]);
+  const preview = (previews && previews[0]) || null;
+  if(!preview) return null;
+  let groundGifts = [];
+  try{
+    const { data:giftRows, error:ge } = await sb
+      .from('gifts')
+      .select('id,kind,message,donor_id,created_at,price_paid')
+      .eq('owner_id', id)
+      .order('created_at', { ascending: true });
+    if(!ge && Array.isArray(giftRows) && giftRows.length > 0){
+      const isOwnTree = currentUserId && String(id) === String(currentUserId);
+      const enriched = isOwnTree ? await attachDonorNames(giftRows) : giftRows;
+      groundGifts = enriched.map(r => giftRowToGroundGift(Object.assign({}, r, {
+        donor_name: isOwnTree ? r.donor_name : 'Друг'
+      })));
+    }
+  }catch(e){
+    warn('getPublicTree gifts load failed:', e);
+  }
+  return {
+    tg_id: String(preview.tg_id),
+    first_name: preview.first_name || 'Друг',
+    tree_level: preview.tree_level ?? 1,
+    lights_count: preview.lights_count ?? 4,
+    star_level: preview.star_level ?? 0,
+    palette: preview.palette || 'champagne',
+    gift_count: Number(preview.gift_count || 0),
+    groundGifts,
+  };
 }
 
 async function getFriendsCarousel(localVisitedIds){
@@ -422,7 +566,9 @@ window.ElkaBackend = {
   water, visit,
   buyGift, buyStarLevel, buyStarGift, buyLiveWater,
   createInvoice, openInvoice,
-  getDonorIds, getTreesPreview, getFriendsCarousel,
+  getDonorIds, getTreesPreview, getFriendsCarousel, getPublicTree,
+  resolveStartParam: parseOwnerIdFromStartParam,
+  trackEvent, flushEvents,
   getMyShareLink, copyText,
   getState(){ return { initialized, currentUserId, currentUserRow, accessTokenPresent:!!accessToken, lastServerSnapshot }; },
   async reload(){ const snap=await SupabaseAdapter.load(); applySnapshot(snap,{source:'manual:reload'}); return snap; },
