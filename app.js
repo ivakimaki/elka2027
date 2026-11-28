@@ -141,15 +141,17 @@ function markDirty(){
 dirty=true;
 if(saveTimer) clearTimeout(saveTimer);
 saveTimer=setTimeout(()=>flushSave(), SAVE_DELAY_MS);
+if(window.ElkaBackend && typeof window.ElkaBackend.queueSave==='function') window.ElkaBackend.queueSave();
 }
 function flushSave(immediate=false){
-if(!dirty) return;
+if(!dirty && !immediate) return;
 const cur=snapshot();
 const diff=diffSnapshots(lastSaved,cur);
-if(Object.keys(diff).length===0){ dirty=false; return; }
+if(Object.keys(diff).length===0 && !immediate){ dirty=false; return; }
 lastSaved=cur; dirty=false;
 if(immediate && saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
 try{ localStorage.setItem(SAVE_KEY, JSON.stringify(cur)); }catch(e){}
+if(window.ElkaBackend && typeof window.ElkaBackend.flushSave==='function'){ window.ElkaBackend.flushSave().catch(e=>console.warn('Backend flushSave error',e)); }
 }
 function loadSave(){ try{ const r=localStorage.getItem(SAVE_KEY); return r?JSON.parse(r):null; }catch(e){ return null; } }
 (function(){
@@ -180,6 +182,59 @@ if(Array.isArray(s.groundGifts)) state.groundGifts=s.groundGifts;
 })();
 window.addEventListener("beforeunload",()=>flushSave(true));
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden") flushSave(true); });
+
+const hooks = window.ElkaClientHooks = window.ElkaClientHooks || {};
+hooks.getSnapshot = snapshot;
+hooks.applySnapshot = function(snap){
+  if(!snap) return;
+  if(typeof snap.sparks==='number') state.sparks=snap.sparks;
+  if(typeof snap.starLevel==='number') state.starLevel=snap.starLevel;
+  if(snap.starColor && STAR_COLORS[snap.starColor]) state.starColor=snap.starColor;
+  if(snap.unlockedStarColors) state.unlockedStarColors=snap.unlockedStarColors;
+  if(snap.unlockedPalettes) state.unlockedPalettes=snap.unlockedPalettes;
+  if(snap.palette && PALETTES[snap.palette]) LIGHT_CONFIG.palette=snap.palette;
+  if(typeof snap.treeLevel==='number'){
+    state.treeLevel=snap.treeLevel;
+    if(TREE_LEVELS[state.treeLevel-1]) TREE_CONFIG.growthCm=TREE_LEVELS[state.treeLevel-1].heightCm;
+  }
+  if(typeof snap.warmth==='number') state.warmth=snap.warmth;
+  if(typeof snap.lightsCount==='number') LIGHT_CONFIG.count=snap.lightsCount;
+  if(snap.waterDay!==undefined) state.waterDay=snap.waterDay;
+  if(typeof snap.waterCount==='number') state.waterCount=snap.waterCount;
+  if(snap.liveWaterDay!==undefined) state.liveWaterDay=snap.liveWaterDay;
+  if(typeof snap.liveWaterCount==='number') state.liveWaterCount=snap.liveWaterCount;
+  if(snap.dailyLastDate!==undefined) state.dailyLastDate=snap.dailyLastDate;
+  if(typeof snap.streakCount==='number') state.streakCount=snap.streakCount;
+  if(snap.discountEnd!==undefined) state.discountEnd=snap.discountEnd;
+  if(Array.isArray(snap.groundGifts)) state.groundGifts=snap.groundGifts;
+  lastSaved=snapshot();
+  syncUI();
+};
+hooks.patchSnapshot = function(patch){
+  if(!patch) return;
+  let changed=false;
+  if(patch.sparks!==undefined){ state.sparks=patch.sparks; changed=true; }
+  if(patch.starLevel!==undefined){ state.starLevel=patch.starLevel; changed=true; }
+  if(patch.starColor!==undefined){ state.starColor=patch.starColor; changed=true; }
+  if(patch.unlockedStarColors!==undefined){ state.unlockedStarColors=patch.unlockedStarColors; changed=true; }
+  if(patch.palette!==undefined){ LIGHT_CONFIG.palette=patch.palette; changed=true; }
+  if(patch.unlockedPalettes!==undefined){ state.unlockedPalettes=patch.unlockedPalettes; changed=true; }
+  if(patch.treeLevel!==undefined){ state.treeLevel=patch.treeLevel; TREE_CONFIG.growthCm=TREE_LEVELS[state.treeLevel-1].heightCm; changed=true; }
+  if(patch.warmth!==undefined){ state.warmth=patch.warmth; changed=true; }
+  if(patch.lightsCount!==undefined){ LIGHT_CONFIG.count=patch.lightsCount; changed=true; }
+  if(patch.waterDay!==undefined){ state.waterDay=patch.waterDay; changed=true; }
+  if(patch.waterCount!==undefined){ state.waterCount=patch.waterCount; changed=true; }
+  if(patch.liveWaterDay!==undefined){ state.liveWaterDay=patch.liveWaterDay; changed=true; }
+  if(patch.liveWaterCount!==undefined){ state.liveWaterCount=patch.liveWaterCount; changed=true; }
+  if(patch.dailyLastDate!==undefined){ state.dailyLastDate=patch.dailyLastDate; changed=true; }
+  if(patch.streakCount!==undefined){ state.streakCount=patch.streakCount; changed=true; }
+  if(patch.discountEnd!==undefined){ state.discountEnd=patch.discountEnd; changed=true; }
+  if(changed){
+    lastSaved=snapshot();
+    syncUI();
+  }
+};
+hooks.showToast = showToast;
 
 const app=document.getElementById("app");
 const canvas=document.getElementById("scene");
@@ -312,7 +367,7 @@ for(let i=screenGiftHitboxes.length-1;i>=0;i--){
 const hb=screenGiftHitboxes[i];
 if(Math.hypot(cx-hb.x,cy-hb.y)<=Math.max(26,hb.size)){
 if(state.isGuest) showToast(`🎁 Подарок «${hb.label}» под ёлкой (имя дарителя видит только хозяин)`,true);
-else { const msgLine=hb.message?`\n«${hb.message}»`:""; showToast(`🎁 Подарок «${hb.label}» от друга: ${hb.from}!${msgLine}`,true); }
+else { const msgLine=hb.message?`\n«${hb.message}»`:"; showToast(`🎁 Подарок «${hb.label}» от друга: ${hb.from}!${msgLine}`,true); }
 break;
 }
 }
@@ -555,7 +610,7 @@ const groundGlowR=Math.max(65,baseRadius*1.95*scale);
 const gGrad=ctx.createRadialGradient(cx,groundY+4,4,cx,groundY+4,groundGlowR);
 const litStrength=(0.06+LIGHT_CONFIG.treeLit*0.28)*Math.min(1,LIGHT_CONFIG.count/24);
 gGrad.addColorStop(0,`rgba(${pal[0].glow}, ${litStrength.toFixed(3)})`);
-gGrad.addColorStop(1,"rgba(14, 26, 46, 0)");
+grad.addColorStop(1,"rgba(14, 26, 46, 0)");
 ctx.fillStyle=gGrad;
 ctx.beginPath(); ctx.ellipse(cx,groundY+4,groundGlowR,groundGlowR*0.28,0,0,Math.PI*2); ctx.fill();
 const drawList=[];
@@ -868,7 +923,7 @@ function getFriendsTrees(){
 const visited=loadVisitedTrees()||[];
 const byOwner=new Map();
 DEMO_FRIENDS.forEach(t=>byOwner.set(t.owner,{...t}));
-visited.forEach(v=>{ const base=byOwner.get(v.owner)||{}; byOwner.set(v.owner,{...base,...v}); });
+visited.forEach(v=>{ const base=byOwner.get(v.owner)||"{}"; byOwner.set(v.owner,{...base,...v}); });
 const arr=Array.from(byOwner.values());
 arr.sort((a,b)=>(b.lastVisit||0)-(a.lastVisit||0));
 return arr;
@@ -930,7 +985,7 @@ box.appendChild(card);
 });
 }
 
-function doWater(){
+async function doWater(){
 const now=Date.now();
 const wRem=waterRemaining();
 if(now<state.waterCdEnd || wRem<=0){
@@ -944,6 +999,9 @@ title:"⚡ Живая вода",
 desc:`Мгновенно, без ожидания отката:\n+${WATER_CONFIG.liveWarmth} к прогрессу роста, +${WATER_CONFIG.liveLights} огонька, +${WATER_CONFIG.liveSparks} 🔥.`,
 price:lwPrice, okText:"Купить",
 onOk:()=>{
+if(window.ElkaBackend && typeof window.ElkaBackend.buyLiveWater==='function'){
+window.ElkaBackend.buyLiveWater().catch(e=>showToast("Ошибка оплаты: "+e.message));
+} else {
 if(state.liveWaterDay!==todayStr()){ state.liveWaterDay=todayStr(); state.liveWaterCount=0; }
 state.liveWaterCount++;
 gainWarmth(WATER_CONFIG.liveWarmth);
@@ -952,11 +1010,23 @@ state.sparks+=WATER_CONFIG.liveSparks;
 markDirty(); syncUI();
 spawnBurst(lastBaseScreen.x,lastBaseScreen.y-50,200);
 showToast(`⚡ Живая вода (демо): +${WATER_CONFIG.liveWarmth} к прогрессу, +${WATER_CONFIG.liveLights} огонька, +${WATER_CONFIG.liveSparks} 🔥`);
+}
 },
 onCancel:()=>{}
 });
 return;
 }
+
+if(window.ElkaBackend && typeof window.ElkaBackend.water==='function'){
+try{
+const res = await window.ElkaBackend.water();
+if(res && res.user){
+spawnBurst(lastBaseScreen.x,lastBaseScreen.y-50,200);
+}
+}catch(e){
+console.warn('Backend water failed, fallback to local', e);
+}
+} else {
 if(state.waterDay!==todayStr()){ state.waterDay=todayStr(); state.waterCount=0; }
 state.waterCount++;
 state.waterCdEnd=now+WATER_CONFIG.cooldownMs;
@@ -967,8 +1037,9 @@ markDirty(); syncUI();
 spawnBurst(lastBaseScreen.x,lastBaseScreen.y-50,200);
 showToast(`💧 +${WATER_CONFIG.lights} огонь, +${WATER_CONFIG.sparks} 🔥, прогресс +${WATER_CONFIG.warmth}`);
 }
+}
 
-document.getElementById("btnWater").addEventListener("click",doWater);
+document.getElementById("btnWater").addEventListener("click",()=>doWater().catch(e=>console.warn(e)));
 document.getElementById("btnDailyGift").addEventListener("click",()=>{
 const today=todayStr();
 if(state.dailyLastDate===today){ showToast("🎁 Бонус уже получен сегодня — приходите завтра!",true); return; }
@@ -989,10 +1060,21 @@ document.getElementById("btnOpenShare").addEventListener("click",()=>toggleSheet
 document.getElementById("btnOpenGiftShop").addEventListener("click",()=>toggleSheet("sheetGifts"));
 document.getElementById("btnCopyBio").addEventListener("click",()=>{
 const txt=document.getElementById("bioText").textContent.trim();
-if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{});
-showToast("📋 Скопировано! Вставьте в Bio.",true);
+if(window.ElkaBackend && typeof window.ElkaBackend.copyText==='function'){
+window.ElkaBackend.copyText(txt).then(ok=>showToast(ok?"📋 Скопировано! Вставьте в Bio.":"Не удалось скопировать",true));
+} else if(navigator.clipboard) navigator.clipboard.writeText(txt).then(()=>showToast("📋 Скопировано! Вставьте в Bio.",true)).catch(()=>{});
 });
-document.getElementById("btnSimVisit").addEventListener("click",()=>{
+document.getElementById("btnSimVisit").addEventListener("click",async()=>{
+if(window.ElkaBackend && typeof window.ElkaBackend.CONFIG==='object' && window.ElkaBackend.CONFIG.USE_BACKEND){
+const sh=window.ElkaBackend.getMyShareLink();
+const ownerId=sh?sh.replace(/^u/,''):null;
+if(ownerId && ownerId!==window.ElkaBackend.getState().currentUserId){
+try{
+await window.ElkaBackend.visit(ownerId);
+return;
+}catch(e){console.warn('Backend visit sim failed',e);}
+}
+}
 if(state.visitDay!==todayStr()){ state.visitDay=todayStr(); state.visitCount=0; }
 state.visitCount++;
 state.totalVisits++;
