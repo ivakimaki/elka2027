@@ -122,18 +122,32 @@ let lastDailyKey=dailyKey();
 
 const SAVE_KEY="elka_save_v141", SAVE_DELAY_MS=30000;
 let saveTimer=null, lastSaved=null, dirty=false;
+function isBackendReady(){
+return !!(window.ElkaBackend && typeof window.ElkaBackend.getState==="function" && window.ElkaBackend.getState().initialized);
+}
+function parseTs(v){
+if(typeof v==="number" && !isNaN(v)) return v;
+if(typeof v==="string" && v){ const t=Date.parse(v); return isNaN(t)?0:t; }
+return 0;
+}
+function normalizeGift(g){
+const def=GIFT_ITEMS.find(x=>x.kind===g.kind);
+return {kind:g.kind,icon:g.icon||(def?def.icon:"🎁"),label:g.label||(def?def.label:"Подарок"),from:g.from||"Друг",scale:def?def.scale:(g.scale||1),message:g.message||""};
+}
 function snapshot(){
+const own=(state.isGuest && state.ownerBackup)?state.ownerBackup:null;
+const giftsSrc=own?own.gifts:state.groundGifts;
 return {
-sparks:state.sparks, starLevel:state.starLevel, starColor:state.starColor,
+sparks:state.sparks, starLevel:own?own.star:state.starLevel, starColor:own?own.starColor:state.starColor,
 unlockedPalettes:{...state.unlockedPalettes}, unlockedStarColors:{...state.unlockedStarColors},
-palette:LIGHT_CONFIG.palette, treeLevel:state.treeLevel, warmth:state.warmth, lightsCount:LIGHT_CONFIG.count,
+palette:own?own.palette:LIGHT_CONFIG.palette, treeLevel:own?own.treeLevel:state.treeLevel, warmth:own?own.warmth:state.warmth, lightsCount:own?own.lights:LIGHT_CONFIG.count,
 waterDay:state.waterDay, waterCount:state.waterCount,
 liveWaterDay:state.liveWaterDay, liveWaterCount:state.liveWaterCount,
 visitDay:state.visitDay, visitCount:state.visitCount, totalVisits:state.totalVisits,
 dailyLastDate:state.dailyLastDate, streakCount:state.streakCount,
 maxGrowthToast:state.maxGrowthToast, maxLightsToast:state.maxLightsToast,
 discountEnd:state.discountEnd,
-groundGifts:state.groundGifts.map(g=>({kind:g.kind,icon:g.icon,label:g.label,from:g.from,scale:g.scale,message:g.message||""}))
+groundGifts:(giftsSrc||[]).map(g=>({kind:g.kind,icon:g.icon,label:g.label,from:g.from,scale:g.scale,message:g.message||""}))
 };
 }
 function diffSnapshots(a,b){ if(!a) return b; const o={}; for(const k of Object.keys(b)) if(JSON.stringify(a[k])!==JSON.stringify(b[k])) o[k]=b[k]; return o; }
@@ -141,8 +155,10 @@ function markDirty(){
 dirty=true;
 if(saveTimer) clearTimeout(saveTimer);
 saveTimer=setTimeout(()=>flushSave(), SAVE_DELAY_MS);
+if(isBackendReady()) window.ElkaBackend.queueSave();
 }
 function flushSave(immediate=false){
+if(immediate && isBackendReady()) window.ElkaBackend.flushSave().catch(()=>{});
 if(!dirty) return;
 const cur=snapshot();
 const diff=diffSnapshots(lastSaved,cur);
@@ -151,6 +167,107 @@ lastSaved=cur; dirty=false;
 if(immediate && saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
 try{ localStorage.setItem(SAVE_KEY, JSON.stringify(cur)); }catch(e){}
 }
+function applyServerState(data, isPatch){
+if(!data || typeof data!=="object") return;
+if(data.sparks!==undefined && data.sparks!==null) state.sparks=Math.max(0,Number(data.sparks)||0);
+if(data.unlockedPalettes && typeof data.unlockedPalettes==="object"){
+if(!isPatch) state.unlockedPalettes={champagne:true};
+for(const k in data.unlockedPalettes) if(PALETTES[k] && data.unlockedPalettes[k]) state.unlockedPalettes[k]=true;
+}
+if(data.unlockedStarColors && typeof data.unlockedStarColors==="object"){
+if(!isPatch) state.unlockedStarColors={ruby:true};
+for(const k in data.unlockedStarColors) if(STAR_COLORS[k] && data.unlockedStarColors[k]) state.unlockedStarColors[k]=true;
+}
+if(data.waterDay!==undefined) state.waterDay=data.waterDay||"";
+if(data.waterCount!==undefined) state.waterCount=Number(data.waterCount)||0;
+if(data.liveWaterDay!==undefined) state.liveWaterDay=data.liveWaterDay||"";
+if(data.liveWaterCount!==undefined) state.liveWaterCount=Number(data.liveWaterCount)||0;
+if(data.dailyLastDate!==undefined) state.dailyLastDate=data.dailyLastDate||"";
+if(data.streakCount!==undefined) state.streakCount=Number(data.streakCount)||0;
+if(data.discountEnd!==undefined) state.discountEnd=parseTs(data.discountEnd);
+if(!isPatch){
+if(typeof data.visitDay==="string") state.visitDay=data.visitDay;
+if(typeof data.visitCount==="number") state.visitCount=data.visitCount;
+if(typeof data.totalVisits==="number") state.totalVisits=data.totalVisits;
+}
+if(state.isGuest && state.ownerBackup){
+if(data.treeLevel!==undefined) state.ownerBackup.treeLevel=Math.max(1,Math.min(TREE_LEVELS.length,Number(data.treeLevel)||1));
+if(data.warmth!==undefined) state.ownerBackup.warmth=Math.max(0,Number(data.warmth)||0);
+if(data.lightsCount!==undefined) state.ownerBackup.lights=Math.max(1,Math.min(MAX_LIGHTS,Number(data.lightsCount)||4));
+if(data.starLevel!==undefined) state.ownerBackup.star=Math.max(0,Math.min(5,Number(data.starLevel)||0));
+if(data.starColor && STAR_COLORS[data.starColor]) state.ownerBackup.starColor=data.starColor;
+if(data.palette && PALETTES[data.palette]) state.ownerBackup.palette=data.palette;
+if(Array.isArray(data.groundGifts)) state.ownerBackup.gifts=data.groundGifts.map(normalizeGift);
+} else {
+const prevTreeLvl=state.treeLevel;
+if(data.treeLevel!==undefined){ state.treeLevel=Math.max(1,Math.min(TREE_LEVELS.length,Number(data.treeLevel)||1)); TREE_CONFIG.growthCm=TREE_LEVELS[state.treeLevel-1].heightCm; }
+if(data.warmth!==undefined) state.warmth=Math.max(0,Number(data.warmth)||0);
+if(data.lightsCount!==undefined) LIGHT_CONFIG.count=Math.max(1,Math.min(MAX_LIGHTS,Number(data.lightsCount)||4));
+if(data.starLevel!==undefined) state.starLevel=Math.max(0,Math.min(5,Number(data.starLevel)||0));
+if(data.starColor && STAR_COLORS[data.starColor]) state.starColor=data.starColor;
+if(data.palette && PALETTES[data.palette]) LIGHT_CONFIG.palette=data.palette;
+if(Array.isArray(data.groundGifts)) state.groundGifts=data.groundGifts.map(normalizeGift);
+if(isPatch && state.treeLevel>prevTreeLvl){
+const lvl=TREE_LEVELS[state.treeLevel-1];
+showToast(`🎉 Уровень ${state.treeLevel}: «${lvl.name}»! Ёлка выросла до ${lvl.heightCm} см`,true);
+spawnBurst(lastApexScreen.x,lastApexScreen.y,48);
+spawnBurst(lastApexScreen.x+24,lastApexScreen.y+26,200);
+}
+}
+lastSaved=snapshot(); dirty=false;
+try{ localStorage.setItem(SAVE_KEY, JSON.stringify(lastSaved)); }catch(e){}
+if(typeof updateShareLinkUI==="function") updateShareLinkUI();
+if(typeof syncUI==="function") syncUI();
+if(typeof refreshGiftPrices==="function") refreshGiftPrices();
+}
+function openFriendTree(ft, opts){
+if(!ft) return;
+const ownerId=String(ft.tg_id||ft.owner||"");
+const treeLvl=ft.tree_level!=null?Math.max(1,Math.min(TREE_LEVELS.length,Number(ft.tree_level)||1)):(ft.treeLevel||levelForHeight(ft.heightCm||45));
+const entry={
+owner:ownerId,
+name:ft.first_name||ft.name||"Друг",
+emoji:ft.emoji||"🎄",
+treeLevel:treeLvl,
+heightCm:TREE_LEVELS[treeLvl-1].heightCm,
+lights:Number(ft.lights_count!=null?ft.lights_count:(ft.lights||4)),
+starLevel:Number(ft.star_level!=null?ft.star_level:(ft.starLevel||0)),
+palette:(ft.palette && PALETTES[ft.palette])?ft.palette:"champagne",
+giftCount:Number(ft.gift_count!=null?ft.gift_count:(ft.giftCount||0)),
+groundGifts:Array.isArray(ft.groundGifts)?ft.groundGifts.map(normalizeGift):null,
+newGift:false
+};
+currentFriend=entry;
+recordVisit(entry);
+setGuestMode(true, opts||{});
+}
+window.ElkaClientHooks=window.ElkaClientHooks||{};
+Object.assign(window.ElkaClientHooks,{
+getSnapshot:()=>snapshot(),
+applySnapshot:(snap,meta)=>{
+applyServerState(snap,false);
+if(meta && meta.source==="payment:paid" && state.isGuest && currentFriend && /^\d+$/.test(String(currentFriend.owner)) && window.ElkaBackend && typeof window.ElkaBackend.getPublicTree==="function"){
+window.ElkaBackend.getPublicTree(currentFriend.owner).then(pt=>{
+if(pt && state.isGuest && currentFriend && currentFriend.owner===String(pt.tg_id)) openFriendTree(pt,{preserveSheets:true});
+}).catch(()=>{});
+}
+},
+patchSnapshot:(patch)=>applyServerState(patch,true),
+showToast:(text)=>showToast(text),
+playWaterAnimation:()=>spawnBurst(lastBaseScreen.x,lastBaseScreen.y-50,200),
+onVisitResult:(data,meta)=>{
+const pt=meta && meta.publicTree ? meta.publicTree : null;
+if(pt) openFriendTree(pt,{preserveSheets:!!(meta && meta.openGifts)});
+else if(data && data.owner) openFriendTree(data.owner,{preserveSheets:!!(meta && meta.openGifts)});
+}
+});
+window.addEventListener("elka:guest-tree",(e)=>{
+const d=e.detail||{};
+if(d.publicTree && d.source==="start_param" && !state.isGuest) openFriendTree(d.publicTree);
+});
+window.addEventListener("elka:backend-ready",()=>{
+if(typeof updateShareLinkUI==="function") updateShareLinkUI();
+});
 function loadSave(){ try{ const r=localStorage.getItem(SAVE_KEY); return r?JSON.parse(r):null; }catch(e){ return null; } }
 (function(){
 const s=loadSave(); if(!s) return;
@@ -737,7 +854,16 @@ showConfirm({
 title:`${topStarSvg(18,"#f5b82e")} ${toShow.title}`,
 desc:`${toShow.desc}\nУровень звезды останется навсегда.`,
 price:confPrice, okText:"Купить",
-onOk:()=>{ showToast(`⭐ Установлена звезда: «${toShow.title}» (демо, ${cost} ⭐)!`,true); revealStar(toShow.lvl,null); },
+onOk:async()=>{
+if(isBackendReady()){
+try{
+const status=await window.ElkaBackend.buyStarLevel(toShow.lvl);
+if(status==="paid") revealStar(toShow.lvl,null);
+}catch(err){ showToast("Не удалось создать платёж: "+(err&&err.message?err.message:err),true); }
+return;
+}
+showToast(`⭐ Установлена звезда: «${toShow.title}» (демо, ${cost} ⭐)!`,true); revealStar(toShow.lvl,null);
+},
 onCancel:()=>{}
 });
 }
@@ -829,8 +955,35 @@ title:`🎁 ${g.label}`,
 desc:"Подарок встанет под ёлку друга и простоит весь сезон. Имя дарителя увидит только хозяин.",
 price:"", okText:"Подарить",
 gift:{kind:g.kind,size:giftSize}, showInput:true,
-onOk:()=>{
+onOk:async()=>{
 const msg=document.getElementById("confirmInput").value.trim().slice(0,40);
+const targetOwner=currentFriend && currentFriend.owner ? String(currentFriend.owner) : "";
+if(isBackendReady()){
+if(!targetOwner || !/^\d+$/.test(targetOwner)){
+showToast("🎁 Зайдите на реальную ёлку друга (из вкладки «Друзья» или по ссылке), чтобы подарить подарок!",true);
+return;
+}
+try{
+const status=await window.ElkaBackend.buyGift(targetOwner,g.kind,msg);
+if(status==="paid"){
+state.groundGifts.push({kind:g.kind,icon:g.icon,label:g.label,from:"Вы",scale:g.scale,message:msg});
+if(currentFriend){
+if(!Array.isArray(currentFriend.groundGifts)) currentFriend.groundGifts=[];
+currentFriend.groundGifts.push({kind:g.kind,icon:g.icon,label:g.label,from:"Вы",scale:g.scale,message:msg});
+}
+spawnBurst(lastBaseScreen.x,lastBaseScreen.y-30,330);
+spawnBurst(lastBaseScreen.x,lastBaseScreen.y-10,48);
+setTimeout(()=>{
+if(state.isGuest && currentFriend && currentFriend.owner===targetOwner && window.ElkaBackend.getPublicTree){
+window.ElkaBackend.getPublicTree(targetOwner).then(pt=>{
+if(pt && state.isGuest && currentFriend && currentFriend.owner===targetOwner) openFriendTree(pt,{preserveSheets:true});
+}).catch(()=>{});
+}
+},1200);
+}
+}catch(err){ showToast("Не удалось создать платёж: "+(err&&err.message?err.message:err),true); }
+return;
+}
 state.groundGifts.push({kind:g.kind,icon:g.icon,label:g.label,from:"Вы (Гость)",scale:g.scale,message:msg});
 markDirty();
 spawnBurst(lastBaseScreen.x,lastBaseScreen.y-30,330);
@@ -864,19 +1017,43 @@ const DEMO_FRIENDS=[
 ];
 function loadVisitedTrees(){ try{ const r=localStorage.getItem("visited_trees"); return r?JSON.parse(r):null; }catch(e){ return null; } }
 function saveVisitedTrees(trees){ try{ localStorage.setItem("visited_trees",JSON.stringify(trees.slice(0,12))); }catch(e){} }
+let backendFriendsCache=[], friendsLoadedOnce=false, friendsFetching=false;
 function getFriendsTrees(){
 const visited=loadVisitedTrees()||[];
 const byOwner=new Map();
+if(isBackendReady()){
+backendFriendsCache.forEach(t=>byOwner.set(String(t.owner),{...t}));
+visited.forEach(v=>{
+if(!/^\d+$/.test(String(v.owner))) return;
+const base=byOwner.get(String(v.owner))||{};
+byOwner.set(String(v.owner),{...v,...base,lastVisit:v.lastVisit||0});
+});
+} else {
 DEMO_FRIENDS.forEach(t=>byOwner.set(t.owner,{...t}));
 visited.forEach(v=>{ const base=byOwner.get(v.owner)||{}; byOwner.set(v.owner,{...base,...v}); });
+}
 const arr=Array.from(byOwner.values());
 arr.sort((a,b)=>(b.lastVisit||0)-(a.lastVisit||0));
 return arr;
 }
+async function refreshBackendFriends(){
+if(!isBackendReady() || friendsFetching) return;
+friendsFetching=true;
+try{
+const visited=(loadVisitedTrees()||[]).filter(v=>/^\d+$/.test(String(v.owner))).map(v=>String(v.owner));
+const previews=await window.ElkaBackend.getFriendsCarousel(visited);
+backendFriendsCache=(previews||[]).map(p=>{
+const lvl=Math.max(1,Math.min(TREE_LEVELS.length,Number(p.tree_level)||1));
+return {owner:String(p.tg_id),name:p.first_name||"Друг",emoji:"🎄",treeLevel:lvl,heightCm:TREE_LEVELS[lvl-1].heightCm,lights:Number(p.lights_count||4),starLevel:Number(p.star_level||0),palette:p.palette||"champagne",giftCount:Number(p.gift_count||0),newGift:Number(p.gift_count||0)>0};
+});
+friendsLoadedOnce=true;
+if(document.getElementById("sheetFriends").classList.contains("open")) renderFriendsCarousel(true);
+}catch(e){}finally{ friendsFetching=false; }
+}
 function recordVisit(t){
 let trees=loadVisitedTrees()||[];
-const entry={owner:t.owner,name:t.name,emoji:t.emoji,heightCm:t.heightCm,lights:t.lights,starLevel:t.starLevel,newGift:false,lastVisit:Date.now()};
-const idx=trees.findIndex(x=>x.owner===t.owner);
+const entry={owner:String(t.owner),name:t.name,emoji:t.emoji||"🎄",treeLevel:t.treeLevel,heightCm:t.heightCm,lights:t.lights,starLevel:t.starLevel,palette:t.palette||"champagne",newGift:false,lastVisit:Date.now()};
+const idx=trees.findIndex(x=>String(x.owner)===entry.owner);
 if(idx>=0) trees[idx]=entry; else trees.unshift(entry);
 saveVisitedTrees(trees);
 }
@@ -888,21 +1065,47 @@ if(idx>=0) trees[idx].starLevel=Math.max(trees[idx].starLevel||0,lvl);
 else { const demo=DEMO_FRIENDS.find(d=>d.owner===owner); if(demo) trees.unshift({...demo,starLevel:lvl,newGift:false,lastVisit:Date.now()}); }
 saveVisitedTrees(trees);
 }
-function renderFriendsCarousel(){
+function openFriendFromCarousel(t, openGifts){
+if(isBackendReady() && /^\d+$/.test(String(t.owner))){
+openFriendTree(t,{preserveSheets:false});
+if(openGifts) toggleSheet("sheetGifts");
+window.ElkaBackend.visit(String(t.owner),{source:"carousel",openGifts:!!openGifts}).catch(()=>{
+return window.ElkaBackend.getPublicTree(String(t.owner)).then(pt=>{
+if(pt) openFriendTree(pt,{preserveSheets:!!openGifts});
+});
+});
+return;
+}
+recordVisit(t); currentFriend=t; closeAllSheets(); setGuestMode(true);
+if(openGifts) toggleSheet("sheetGifts");
+else showToast(`✨ Вы в гостях у ${t.name} — ваш огонёк зажёгся!`,true);
+}
+function renderFriendsCarousel(skipFetch){
 const box=document.getElementById("friendsCarousel");
 box.innerHTML="";
+if(isBackendReady() && !skipFetch) refreshBackendFriends();
 const trees=getFriendsTrees();
+if(isBackendReady() && trees.length===0){
+const empty=document.createElement("div");
+empty.className="friend-card";
+empty.style.cssText="min-width:240px;justify-content:center;align-items:center;text-align:center;gap:8px;";
+if(!friendsLoadedOnce){
+empty.innerHTML=`<div class="friend-name">⏳ Загрузка друзей...</div>`;
+} else {
+empty.innerHTML=`<div class="friend-name">Пока нет друзей 🎄</div><div class="friend-stats">Поделись своей ссылкой или зайди по ссылке друга</div><button class="friend-btn gift" style="flex:none;padding:7px 12px;">🎁 Поделиться</button>`;
+const shareBtn=empty.querySelector("button");
+if(shareBtn) shareBtn.addEventListener("click",()=>{ if(typeof updateShareLinkUI==="function") updateShareLinkUI(); toggleSheet("sheetShare"); });
+}
+box.appendChild(empty);
+return;
+}
 trees.forEach(t=>{
 const card=document.createElement("div");
 card.className="friend-card";
-card.innerHTML=`<div class="friend-name">${t.emoji} ${t.name}</div><div class="friend-stats">${t.heightCm} см · ${t.lights} огн.<br>${topStarSvg(11,"#f5b82e")} ур.${t.starLevel}</div><div class="friend-badge">${t.newGift?'🎁 новый подарок!':''}</div><div class="friend-actions"><button class="friend-btn visit">Зайти</button><button class="friend-btn gift">🎁</button><button class="friend-btn stargift">${topStarSvg(12,"#e9d5ff")}</button></div>`;
-card.querySelector(".visit").addEventListener("click",()=>{
-recordVisit(t); currentFriend=t; closeAllSheets(); setGuestMode(true);
-showToast(`✨ Вы в гостях у ${t.name} — ваш огонёк зажёгся!`,true);
-});
-card.querySelector(".gift").addEventListener("click",()=>{
-recordVisit(t); currentFriend=t; closeAllSheets(); setGuestMode(true); toggleSheet("sheetGifts");
-});
+const badgeTxt=t.giftCount>0?`🎁 подарков: ${t.giftCount}`:(t.newGift?'🎁 новый подарок!':'');
+card.innerHTML=`<div class="friend-name">${t.emoji||"🎄"} ${t.name}</div><div class="friend-stats">${t.heightCm} см · ${t.lights} огн.<br>${topStarSvg(11,"#f5b82e")} ур.${t.starLevel}</div><div class="friend-badge">${badgeTxt}</div><div class="friend-actions"><button class="friend-btn visit">Зайти</button><button class="friend-btn gift">🎁</button><button class="friend-btn stargift">${topStarSvg(12,"#e9d5ff")}</button></div>`;
+card.querySelector(".visit").addEventListener("click",()=>openFriendFromCarousel(t,false));
+card.querySelector(".gift").addEventListener("click",()=>openFriendFromCarousel(t,true));
 card.querySelector(".stargift").addEventListener("click",()=>{
 const cur=t.starLevel||0;
 if(cur>=5){ showToast(`⭐ У ${t.name} уже максимальная звезда!`,true); return; }
@@ -916,7 +1119,26 @@ showConfirm({
 title:`${topStarSvg(18,"#f5b82e")} Подарить «${starDef.title}»`,
 desc:`Друг ${t.name} получит уровень ${targetLvl} звезды навсегда.${jumpNote}`,
 price:confPrice, okText:"Подарить",
-onOk:()=>{
+onOk:async()=>{
+if(isBackendReady()){
+if(!/^\d+$/.test(String(t.owner))){
+showToast("⭐ Подарить настоящую звезду можно только реальному другу.",true);
+return;
+}
+try{
+const status=await window.ElkaBackend.buyStarGift(String(t.owner));
+if(status==="paid"){
+t.starLevel=targetLvl;
+const cached=backendFriendsCache.find(x=>x.owner===String(t.owner));
+if(cached) cached.starLevel=targetLvl;
+renderFriendsCarousel(true);
+spawnBurst(W*0.5,H*0.4,280);
+spawnBurst(W*0.5,H*0.45,48);
+showToast(`⭐ Вы подарили «${starDef.title}» — ${t.name}!`,true);
+}
+}catch(err){ showToast("Не удалось создать платёж: "+(err&&err.message?err.message:err),true); }
+return;
+}
 applyStarGiftToFriend(t.owner,targetLvl);
 renderFriendsCarousel();
 spawnBurst(W*0.5,H*0.4,280);
@@ -930,7 +1152,8 @@ box.appendChild(card);
 });
 }
 
-function doWater(){
+let waterInFlight=false;
+async function doWater(){
 const now=Date.now();
 const wRem=waterRemaining();
 if(now<state.waterCdEnd || wRem<=0){
@@ -943,7 +1166,14 @@ showConfirm({
 title:"⚡ Живая вода",
 desc:`Мгновенно, без ожидания отката:\n+${WATER_CONFIG.liveWarmth} к прогрессу роста, +${WATER_CONFIG.liveLights} огонька, +${WATER_CONFIG.liveSparks} 🔥.`,
 price:lwPrice, okText:"Купить",
-onOk:()=>{
+onOk:async()=>{
+if(isBackendReady()){
+try{
+const status=await window.ElkaBackend.buyLiveWater();
+if(status==="paid") spawnBurst(lastBaseScreen.x,lastBaseScreen.y-50,200);
+}catch(err){ showToast("Не удалось создать платёж: "+(err&&err.message?err.message:err),true); }
+return;
+}
 if(state.liveWaterDay!==todayStr()){ state.liveWaterDay=todayStr(); state.liveWaterCount=0; }
 state.liveWaterCount++;
 gainWarmth(WATER_CONFIG.liveWarmth);
@@ -955,6 +1185,29 @@ showToast(`⚡ Живая вода (демо): +${WATER_CONFIG.liveWarmth} к п
 },
 onCancel:()=>{}
 });
+return;
+}
+if(isBackendReady()){
+if(waterInFlight) return;
+waterInFlight=true;
+try{
+const data=await window.ElkaBackend.water();
+const cdTs=data && data.user && data.user.water_cd_end ? parseTs(data.user.water_cd_end) : 0;
+state.waterCdEnd=cdTs>Date.now()?cdTs:(Date.now()+WATER_CONFIG.cooldownMs);
+syncUI();
+showToast(`💧 +${WATER_CONFIG.lights} огонь, +${WATER_CONFIG.sparks} 🔥, прогресс +${WATER_CONFIG.warmth}`);
+}catch(err){
+if(err && err.details && typeof err.details.secondsLeft==="number"){
+state.waterCdEnd=Date.now()+err.details.secondsLeft*1000;
+syncUI();
+} else if(err && String(err.message||"").toLowerCase().includes("limit")){
+state.waterDay=todayStr();
+state.waterCount=WATER_CONFIG.dailyLimit;
+syncUI();
+}
+}finally{
+waterInFlight=false;
+}
 return;
 }
 if(state.waterDay!==todayStr()){ state.waterDay=todayStr(); state.waterCount=0; }
@@ -985,11 +1238,27 @@ showToast(msg,true);
 document.getElementById("btnTabStar").addEventListener("click",()=>toggleSheet("sheetStar"));
 document.getElementById("btnTabGarland").addEventListener("click",()=>toggleSheet("sheetGarland"));
 document.getElementById("btnTabFriends").addEventListener("click",()=>{ renderFriendsCarousel(); toggleSheet("sheetFriends"); });
-document.getElementById("btnOpenShare").addEventListener("click",()=>toggleSheet("sheetShare"));
+function getShareUrl(){
+const code=(window.ElkaBackend && typeof window.ElkaBackend.getMyShareLink==="function")?window.ElkaBackend.getMyShareLink():null;
+return `t.me/Elka2027Bot/app?startapp=${code||"u777"}`;
+}
+function updateShareLinkUI(){
+const bioEl=document.getElementById("bioText");
+if(bioEl) bioEl.textContent=`🎄 Зажги тёплый огонёк на моей ёлке 2027 → ${getShareUrl()}`;
+}
+document.getElementById("btnOpenShare").addEventListener("click",()=>{ updateShareLinkUI(); toggleSheet("sheetShare"); });
 document.getElementById("btnOpenGiftShop").addEventListener("click",()=>toggleSheet("sheetGifts"));
-document.getElementById("btnCopyBio").addEventListener("click",()=>{
+document.getElementById("btnCopyBio").addEventListener("click",async()=>{
+updateShareLinkUI();
 const txt=document.getElementById("bioText").textContent.trim();
-if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{});
+if(window.ElkaBackend && typeof window.ElkaBackend.copyText==="function"){
+await window.ElkaBackend.copyText(txt).catch(()=>{});
+} else if(navigator.clipboard){
+navigator.clipboard.writeText(txt).catch(()=>{});
+}
+if(isBackendReady() && window.ElkaBackend.trackEvent){
+window.ElkaBackend.trackEvent("share_copied",{code:window.ElkaBackend.getMyShareLink()});
+}
 showToast("📋 Скопировано! Вставьте в Bio.",true);
 });
 document.getElementById("btnSimVisit").addEventListener("click",()=>{
@@ -1003,35 +1272,50 @@ markDirty(); syncUI();
 spawnBurst(lastApexScreen.x,lastApexScreen.y+26,48);
 showToast(`✨ Друг зажёг огонёк: +${VISIT_CONFIG.lights} огня, прогресс +${VISIT_CONFIG.warmth} · визитов сегодня: ${state.visitCount}`,true);
 });
-function setGuestMode(enable){
-closeAllSheets(); flushSave();
+function setGuestMode(enable, opts){
+const preserveSheets=!!(opts && opts.preserveSheets);
+if(!preserveSheets) closeAllSheets();
+flushSave();
+const wasGuest=state.isGuest;
 state.isGuest=enable;
 const btn=document.getElementById("btnToggleGuest");
 const banner=document.getElementById("guestBanner");
 if(enable){
+if(!wasGuest){
 state.ownerBackup={
 treeLevel:state.treeLevel, warmth:state.warmth,
 lights:LIGHT_CONFIG.count, star:state.starLevel, starColor:state.starColor,
 palette:LIGHT_CONFIG.palette, gifts:[...state.groundGifts]
 };
+}
 if(currentFriend){
-state.treeLevel=levelForHeight(currentFriend.heightCm);
+state.treeLevel=currentFriend.treeLevel?Math.max(1,Math.min(TREE_LEVELS.length,currentFriend.treeLevel)):levelForHeight(currentFriend.heightCm);
 TREE_CONFIG.growthCm=TREE_LEVELS[state.treeLevel-1].heightCm;
 LIGHT_CONFIG.count=Math.min(MAX_LIGHTS,currentFriend.lights||4);
 state.starLevel=Math.min(5,currentFriend.starLevel||0);
 state.starColor="gold";
-LIGHT_CONFIG.palette="champagne";
+LIGHT_CONFIG.palette=(currentFriend.palette && PALETTES[currentFriend.palette])?currentFriend.palette:"champagne";
 banner.textContent=`✨ Вы в гостях у ${currentFriend.name} — ваш тёплый огонёк уже зажёгся!`;
-} else {
-state.treeLevel=9; TREE_CONFIG.growthCm=TREE_LEVELS[8].heightCm;
-LIGHT_CONFIG.count=68; state.starLevel=5; state.starColor="gold"; LIGHT_CONFIG.palette="champagne";
-banner.textContent="✨ Вы зашли на ёлку друга — ваш тёплый огонёк уже зажёгся на ветке!";
-}
-state.warmth=0;
+if(Array.isArray(currentFriend.groundGifts)){
+state.groundGifts=currentFriend.groundGifts.map(normalizeGift);
+} else if(!/^\d+$/.test(String(currentFriend.owner||""))){
 state.groundGifts=[
 {kind:"champagne",icon:"🍾",label:"Шампанское",from:"Друг",scale:2.0,message:""},
 {kind:"horse",icon:"🐎",label:"Символ года",from:"Друг",scale:3.6,message:""}
 ];
+} else {
+state.groundGifts=[];
+}
+} else {
+state.treeLevel=9; TREE_CONFIG.growthCm=TREE_LEVELS[8].heightCm;
+LIGHT_CONFIG.count=68; state.starLevel=5; state.starColor="gold"; LIGHT_CONFIG.palette="champagne";
+banner.textContent="✨ Вы зашли на ёлку друга — ваш тёплый огонёк уже зажёгся на ветке!";
+state.groundGifts=[
+{kind:"champagne",icon:"🍾",label:"Шампанское",from:"Друг",scale:2.0,message:""},
+{kind:"horse",icon:"🐎",label:"Символ года",from:"Друг",scale:3.6,message:""}
+];
+}
+state.warmth=0;
 btn.classList.add("active"); btn.textContent="🏠 К себе";
 document.getElementById("ownerHud").style.display="none";
 document.getElementById("guestHud").style.display="flex";
