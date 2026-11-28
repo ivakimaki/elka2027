@@ -1,5 +1,5 @@
 /* ============================================================
-SUPABASE BACKEND ADAPTER — v15.3
+SUPABASE BACKEND ADAPTER — v15.4
 ============================================================ */
 (function(){
 'use strict';
@@ -43,14 +43,10 @@ function dispatch(name,detail){ window.dispatchEvent(new CustomEvent(name,{detai
 function parseTsMs(v){ if(!v) return 0; if(typeof v==='number') return v; const t=Date.parse(v); return isNaN(t)?0:t; }
 
 function createSupabaseClient(token){
-  const options = { auth:{ persistSession:false, autoRefreshToken:false, detectSessionInUrl:false }, global:{ headers:{} } };
+  const options = { auth:{ persistSession:false, autoRefreshToken:false, detectSessionInUrl:false } };
   if(token){
-    options.global.headers.Authorization = 'Bearer '+token;
-    options.global.headers.apikey = CONFIG.SUPABASE_ANON_KEY;
+    options.global = { headers: { Authorization: 'Bearer '+token, apikey: CONFIG.SUPABASE_ANON_KEY } };
     options.accessToken = async function(){ return token; };
-  } else {
-    options.global.headers.apikey = CONFIG.SUPABASE_ANON_KEY;
-    options.global.headers.Authorization = 'Bearer '+CONFIG.SUPABASE_ANON_KEY;
   }
   return supabaseLib.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, options);
 }
@@ -146,6 +142,7 @@ function snapshotDiffToDbUpdate(diff){
   if(diff.starLevel!==undefined && Number(diff.starLevel)<=2) u.star_level=diff.starLevel;
   if(diff.dailyLastDate!==undefined) u.daily_last_date=diff.dailyLastDate || null;
   if(diff.streakCount!==undefined) u.streak_count=diff.streakCount;
+  if(diff.discountEnd!==undefined) u.discount_end=diff.discountEnd ? new Date(diff.discountEnd).toISOString() : null;
   return u;
 }
 
@@ -228,12 +225,7 @@ async function init(){
     accessToken = auth.access_token;
     currentUserId = String(auth.user.tg_id || auth.user.id);
     currentUserRow = auth.user;
-    if(auth.refresh_token){
-      const { error } = await sb.auth.setSession({ access_token:auth.access_token, refresh_token:auth.refresh_token });
-      if(error) throw error;
-    } else {
-      sb = createSupabaseClient(accessToken);
-    }
+    sb = createSupabaseClient(accessToken);
     log('tg-auth ok',{ userId:currentUserId, isNew:!!auth.isNew });
     const snap = await SupabaseAdapter.load();
     applySnapshot(snap,{ source:'backend:init', isNew:!!auth.isNew });
@@ -285,9 +277,9 @@ async function parseOwnerIdFromStartParam(sp){
   if(!sp) return null;
   if(/^\d+$/.test(sp)) return sp;
   if(/^[a-zA-Z0-9]{4,10}$/.test(sp)){
-    const { data, error } = await sb.from('users').select('tg_id').eq('invite_code', sp).maybeSingle();
+    const { data, error } = await sb.rpc('resolve_invite_code', { code: sp });
     if(error || !data){ warn('Invite code not found:', sp); return null; }
-    return data.tg_id;
+    return String(data);
   }
   return null;
 }
@@ -302,6 +294,20 @@ async function autoVisitFromStartParam(){
   if(sessionStorage.getItem(lockKey)==='1'){ log('auto visit already attempted'); return null; }
   sessionStorage.setItem(lockKey,'1');
   return visit(ownerId,{ source:'start_param', startParam:sp });
+}
+
+async function logEvent(event, payload){
+  if(!initialized || !currentUserId || !sb || !event) return;
+  try{
+    const { error } = await sb.from('events').insert({
+      tg_id: String(currentUserId),
+      event: String(event),
+      payload: payload || {},
+    });
+    if(error) warn('logEvent error', event, error.message || error);
+  }catch(e){
+    warn('logEvent failed', event, e);
+  }
 }
 
 async function visit(ownerId, meta){
@@ -426,7 +432,7 @@ async function copyText(text){
 window.ElkaBackend = {
   CONFIG, adapter:SupabaseAdapter,
   init, load:SupabaseAdapter.load, save:SupabaseAdapter.save,
-  queueSave, flushSave,
+  queueSave, flushSave, logEvent,
   water, visit,
   buyGift, buyStarLevel, buyStarGift, buyLiveWater,
   createInvoice, openInvoice,

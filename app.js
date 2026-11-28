@@ -59,13 +59,13 @@ const GIFT_ITEMS=[
 ];
 const HIT_KINDS=new Set(["orange"]);
 const GIFT_SVGS={
-bear:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20"><circle cx="6.2" cy="4.2" r="2.1" fill="#B45309"/><circle cx="13.8" cy="4.2" r="2.1" fill="#B45309"/><circle cx="6.2" cy="4.2" r="1" fill="#FDE68A"/><circle cx="13.8" cy="4.2" r="1" fill="#FDE68A"/><ellipse cx="10" cy="12.5" rx="4.6" ry="4.5" fill="#B45309"/><ellipse cx="10" cy="12.8" rx="2.7" ry="2.8" fill="#FDE68A"/><circle cx="5.2" cy="11.2" r="1.7" fill="#92400E"/><circle cx="14.8" cy="11.2" r="1.7" fill="#92400E"/><ellipse cx="6.6" cy="16" rx="2" ry="1.4" fill="#78350F"/><ellipse cx="13.4" cy="16" rx="2" ry="1.4" fill="#78350F"/><circle cx="10" cy="6.6" r="3.9" fill="#D97706"/><ellipse cx="10" cy="7.5" rx="2" ry="1.5" fill="#FEF3C7"/><circle cx="8.6" cy="5.8" r="0.65" fill="#1E293B"/><circle cx="11.4" cy="5.8" r="0.65" fill="#1E293B"/><circle cx="10" cy="7" r="0.75" fill="#1E293B"/><path d="M7.3 9.7Q10 10.7 12.7 9.7" stroke="#DC2626" stroke-width="1.5" stroke-linecap="round" fill="none"/><path d="M11.5 9.8L12.6 12.4" stroke="#DC2626" stroke-width="1.3" stroke-linecap="round"/></svg>`,
-champagne:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20"><path d="M8.8 2h2.4v2.2H8.8z" fill="#F59E0B"/><path d="M8.6 4.2h2.8l.4 3.2c1.1.7 1.7 1.8 1.7 3.2V16c0 .6-.5 1-1.1 1H7.6c-.6 0-1.1-.4-1.1-1v-5.4c0-1.4.6-2.5 1.7-3.2l.4-3.2z" fill="#15803D"/><path d="M8.9 4.5h2.2l.3 2.8c.9.6 1.3 1.5 1.3 2.8v5.5H7.3v-5.5c0-1.3.4-2.2 1.3-2.8l.3-2.8z" fill="#16A34A"/><rect x="7.5" y="10.4" width="5" height="3.4" rx="0.4" fill="#FEF3C7"/><rect x="8.2" y="11.2" width="3.6" height="0.8" fill="#DC2626"/><rect x="8.6" y="4.2" width="2.8" height="1.2" fill="#FBBF24"/><path d="M8 9.2v5.2" stroke="#86EFAC" stroke-width="0.9" stroke-linecap="round"/></svg>`,
-candy:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20"><path d="M2.2 6.5L5.8 8.3 4 11.8 1.8 9.5z" fill="#EF4444"/><path d="M17.8 12.5L14.2 10.7 16 7.2 18.2 9.5z" fill="#EF4444"/><ellipse cx="10" cy="9.5" rx="5.3" ry="4.2" transform="rotate(-18 10 9.5)" fill="#DC2626"/><path d="M7.2 6.3c1.2 1.8 1.6 4 .8 6.3M10.1 5.4c1.3 2 1.7 4.4.8 6.9M12.9 6.2c1.1 1.7 1.4 3.7.7 5.7" stroke="#FEF08A" stroke-width="1.4" stroke-linecap="round" fill="none"/><ellipse cx="8.5" cy="7.4" rx="2.1" ry="0.8" transform="rotate(-22 8.5 7.4)" fill="#FCA5A5" opacity="0.8"/></svg>`,
-horse:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20"><path d="M3.2 15.2Q10 18.3 16.8 15.2" stroke="#B91C1C" stroke-width="1.8" stroke-linecap="round" fill="none"/><path d="M6.4 15.8L7.2 12h5.2l1.1 3.8" stroke="#D97706" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M6.3 9.5h6.2l1.6-4.2 2.5 1.3-.9 2.3-2 .4-.9 3.2H6.5z" fill="#F59E0B"/><path d="M12.4 5.3c-.9.3-1.6 1.4-1.6 2.8" stroke="#92400E" stroke-width="1.5" stroke-linecap="round" fill="none"/><path d="M6.2 9.6c-1.4.2-2.2 1.3-2 2.6" stroke="#92400E" stroke-width="1.5" stroke-linecap="round" fill="none"/><path d="M8.2 9.3h3v2.3h-3z" fill="#DC2626"/><circle cx="14.4" cy="6.6" r="0.55" fill="#1E293B"/></svg>`,
-shoe:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20"><path d="M4.2 12.2v4.6h1.3v-3.5z" fill="#0284C7"/><path d="M3.3 8.8c.6 2.2 2.4 3.4 4.8 3.6 2.5.2 4.3 2.4 8.6 3.5.7.2.9.9.2 1.1-3.3.3-6.5-.3-8.8-2.3-1.5-1.3-3.1-1.3-4.6-.9-.6.1-.9-.4-.8-1l.6-4z" fill="#38BDF8"/><path d="M4.1 9.8c.8 1.8 2.4 2.7 4.5 2.9 2.2.2 4.1 2.1 7.6 3.1" stroke="#E0F2FE" stroke-width="1.1" stroke-linecap="round" fill="none"/><circle cx="15.2" cy="14.7" r="1.2" fill="#FDE047"/><circle cx="15.2" cy="14.7" r="0.5" fill="#FFFFFF"/></svg>`,
-car:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20"><path d="M5.4 9.5L7.3 6.2h5.4l1.9 3.3z" fill="#EF4444"/><path d="M6.4 9.3L7.8 7h4.4l1.4 2.3z" fill="#BAE6FD"/><rect x="2.2" y="9.3" width="15.6" height="5" rx="2" fill="#DC2626"/><rect x="3" y="9.8" width="14" height="1.3" rx="0.6" fill="#F87171"/><circle cx="16.8" cy="11.5" r="0.9" fill="#FEF08A"/><rect x="1.8" y="13.2" width="16.4" height="1.2" rx="0.6" fill="#E2E8F0"/><circle cx="5.8" cy="15.1" r="2.1" fill="#1E293B"/><circle cx="5.8" cy="15.1" r="0.9" fill="#CBD5E1"/><circle cx="14.2" cy="15.1" r="2.1" fill="#1E293B"/><circle cx="14.2" cy="15.1" r="0.9" fill="#CBD5E1"/></svg>`,
-orange:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20"><circle cx="10" cy="11.3" r="5.7" fill="#EA580C"/><circle cx="9.6" cy="10.9" r="5.1" fill="#F97316"/><ellipse cx="7.6" cy="8.7" rx="1.7" ry="1" transform="rotate(-30 7.6 8.7)" fill="#FDBA74"/><path d="M10 6V3.5" stroke="#15803D" stroke-width="1.3" stroke-linecap="round"/><path d="M10 4.6c1.6-2 4.3-1.8 4.8-.3-.7 1.6-3.2 1.8-4.8.3z" fill="#22C55E"/><path d="M10 4.8C8.6 3.3 6.5 3.5 6 4.7c.6 1.2 2.6 1.3 4 .1z" fill="#16A34A"/></svg>`,
+bear:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20"><circle cx="6.2" cy="4.2" r="2.1" fill="#B45309"/><circle cx="13.8" cy="4.2" r="2.1" fill="#B45309"/><circle cx="6.2" cy="4.2" r="1" fill="#FDE68A"/><circle cx="13.8" cy="4.2" r="1" fill="#FDE68A"/><ellipse cx="10" cy="12.5" rx="4.6" ry="4.5" fill="#B45309"/><ellipse cx="10" cy="12.8" rx="2.7" ry="2.8" fill="#FDE68A"/><circle cx="5.2" cy="11.2" r="1.7" fill="#92400E"/><circle cx="14.8" cy="11.2" r="1.7" fill="#92400E"/><ellipse cx="6.6" cy="16" rx="2" ry="1.4" fill="#78350F"/><ellipse cx="13.4" cy="16" rx="2" ry="1.4" fill="#78350F"/><circle cx="10" cy="6.6" r="3.9" fill="#D97706"/><ellipse cx="10" cy="7.5" rx="2" ry="1.5" fill="#FEF3C7"/><circle cx="8.6" cy="5.8" r="0.65" fill="#1E293B"/><circle cx="11.4" cy="5.8" r="0.65" fill="#1E293B"/><circle cx="10" cy="7" r="0.75" fill="#1E293B"/><path d="M7.3 9.7Q10 10.7 12.7 9.7" stroke="#DC2626" stroke-width="1.5" stroke-linecap="round" fill="none"/><path d="M11.5 9.8L12.6 12.4" stroke="#DC2626" stroke-width="1.3" stroke-linecap="round"/></svg>`, 
+champagne:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20"><path d="M8.8 2h2.4v2.2H8.8z" fill="#F59E0B"/><path d="M8.6 4.2h2.8l.4 3.2c1.1.7 1.7 1.8 1.7 3.2V16c0 .6-.5 1-1.1 1H7.6c-.6 0-1.1-.4-1.1-1v-5.4c0-1.4.6-2.5 1.7-3.2l.4-3.2z" fill="#15803D"/><path d="M8.9 4.5h2.2l.3 2.8c.9.6 1.3 1.5 1.3 2.8v5.5H7.3v-5.5c0-1.3.4-2.2 1.3-2.8l.3-2.8z" fill="#16A34A"/><rect x="7.5" y="10.4" width="5" height="3.4" rx="0.4" fill="#FEF3C7"/><rect x="8.2" y="11.2" width="3.6" height="0.8" fill="#DC2626"/><rect x="8.6" y="4.2" width="2.8" height="1.2" fill="#FBBF24"/><path d="M8 9.2v5.2" stroke="#86EFAC" stroke-width="0.9" stroke-linecap="round"/></svg>`, 
+candy:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20"><path d="M2.2 6.5L5.8 8.3 4 11.8 1.8 9.5z" fill="#EF4444"/><path d="M17.8 12.5L14.2 10.7 16 7.2 18.2 9.5z" fill="#EF4444"/><ellipse cx="10" cy="9.5" rx="5.3" ry="4.2" transform="rotate(-18 10 9.5)" fill="#DC2626"/><path d="M7.2 6.3c1.2 1.8 1.6 4 .8 6.3M10.1 5.4c1.3 2 1.7 4.4.8 6.9M12.9 6.2c1.1 1.7 1.4 3.7.7 5.7" stroke="#FEF08A" stroke-width="1.4" stroke-linecap="round" fill="none"/><ellipse cx="8.5" cy="7.4" rx="2.1" ry="0.8" transform="rotate(-22 8.5 7.4)" fill="#FCA5A5" opacity="0.8"/></svg>`, 
+horse:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20"><path d="M3.2 15.2Q10 18.3 16.8 15.2" stroke="#B91C1C" stroke-width="1.8" stroke-linecap="round" fill="none"/><path d="M6.4 15.8L7.2 12h5.2l1.1 3.8" stroke="#D97706" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M6.3 9.5h6.2l1.6-4.2 2.5 1.3-.9 2.3-2 .4-.9 3.2H6.5z" fill="#F59E0B"/><path d="M12.4 5.3c-.9.3-1.6 1.4-1.6 2.8" stroke="#92400E" stroke-width="1.5" stroke-linecap="round" fill="none"/><path d="M6.2 9.6c-1.4.2-2.2 1.3-2 2.6" stroke="#92400E" stroke-width="1.5" stroke-linecap="round" fill="none"/><path d="M8.2 9.3h3v2.3h-3z" fill="#DC2626"/><circle cx="14.4" cy="6.6" r="0.55" fill="#1E293B"/></svg>`, 
+shoe:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20"><path d="M4.2 12.2v4.6h1.3v-3.5z" fill="#0284C7"/><path d="M3.3 8.8c.6 2.2 2.4 3.4 4.8 3.6 2.5.2 4.3 2.4 8.6 3.5.7.2.9.9.2 1.1-3.3.3-6.5-.3-8.8-2.3-1.5-1.3-3.1-1.3-4.6-.9-.6.1-.9-.4-.8-1l.6-4z" fill="#38BDF8"/><path d="M4.1 9.8c.8 1.8 2.4 2.7 4.5 2.9 2.2.2 4.1 2.1 7.6 3.1" stroke="#E0F2FE" stroke-width="1.1" stroke-linecap="round" fill="none"/><circle cx="15.2" cy="14.7" r="1.2" fill="#FDE047"/><circle cx="15.2" cy="14.7" r="0.5" fill="#FFFFFF"/></svg>`, 
+car:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20"><path d="M5.4 9.5L7.3 6.2h5.4l1.9 3.3z" fill="#EF4444"/><path d="M6.4 9.3L7.8 7h4.4l1.4 2.3z" fill="#BAE6FD"/><rect x="2.2" y="9.3" width="15.6" height="5" rx="2" fill="#DC2626"/><rect x="3" y="9.8" width="14" height="1.3" rx="0.6" fill="#F87171"/><circle cx="16.8" cy="11.5" r="0.9" fill="#FEF08A"/><rect x="1.8" y="13.2" width="16.4" height="1.2" rx="0.6" fill="#E2E8F0"/><circle cx="5.8" cy="15.1" r="2.1" fill="#1E293B"/><circle cx="5.8" cy="15.1" r="0.9" fill="#CBD5E1"/><circle cx="14.2" cy="15.1" r="2.1" fill="#1E293B"/><circle cx="14.2" cy="15.1" r="0.9" fill="#CBD5E1"/></svg>`, 
+orange:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20"><circle cx="10" cy="11.3" r="5.7" fill="#EA580C"/><circle cx="9.6" cy="10.9" r="5.1" fill="#F97316"/><ellipse cx="7.6" cy="8.7" rx="1.7" ry="1" transform="rotate(-30 7.6 8.7)" fill="#FDBA74"/><path d="M10 6V3.5" stroke="#15803D" stroke-width="1.3" stroke-linecap="round"/><path d="M10 4.6c1.6-2 4.3-1.8 4.8-.3-.7 1.6-3.2 1.8-4.8.3z" fill="#22C55E"/><path d="M10 4.8C8.6 3.3 6.5 3.5 6 4.7c.6 1.2 2.6 1.3 4 .1z" fill="#16A34A"/></svg>`, 
 coal:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20"><path d="M7.5 4.2l1.8-1.9 2.2 1.1 1.7-1.2 1.5 2v1.6H7.5z" fill="#334155"/><path d="M8.7 3.8l1.2-1 1.4 1" stroke="#64748B" stroke-width="0.9" stroke-linecap="round" fill="none"/><path d="M7.4 6.2h6.8v5.5c0 2.7-1.6 4.7-4.5 5.1l-3.3.3c-1.5.1-2.6-.9-2.6-2.3 0-1.3 1-2.2 2.4-2.3l1.2-.1V6.2z" fill="#DC2626"/><path d="M14.2 11.4c-1.4.2-2.3 1.2-2.3 2.6 0 .8.4 1.5 1 2 .8-.9 1.3-2.4 1.3-4.6z" fill="#FACC15"/><path d="M3.8 14.8c0 1.3 1 2.3 2.4 2.3l.7-.1c-.3-1.5-1.2-2.6-2.6-3-.3.2-.5.5-.5.8z" fill="#FACC15"/><rect x="6.5" y="5.2" width="8.5" height="2.6" rx="1.3" fill="#F8FAFC"/></svg>`
 };
 const giftSvgCache=new Map();
@@ -370,8 +370,9 @@ if(santaActive && Math.hypot(cx-santaX,cy-santaY)<Math.max(44,52*camZoom)){ catc
 for(let i=screenGiftHitboxes.length-1;i>=0;i--){
 const hb=screenGiftHitboxes[i];
 if(Math.hypot(cx-hb.x,cy-hb.y)<=Math.max(26,hb.size)){
+if(window.ElkaBackend && typeof window.ElkaBackend.logEvent==='function') window.ElkaBackend.logEvent('gift_tapped',{label:hb.label});
 if(state.isGuest) showToast(`🎁 Подарок «${hb.label}» под ёлкой (имя дарителя видит только хозяин)`,true);
-else { const msgLine=hb.message?`\n«${hb.message}»`:""; showToast(`🎁 Подарок «${hb.label}» от друга: ${hb.from}!${msgLine}`,true); }
+else { const msgLine=hb.message?`\n«${hb.message}»`:"; showToast(`🎁 Подарок «${hb.label}» от друга: ${hb.from}!${msgLine}`,true); }
 break;
 }
 }
@@ -568,6 +569,7 @@ const total=parseInt(localStorage.getItem("santa_total")||"0",10)+1;
 localStorage.setItem("santa_total",String(total));
 if(total>=5 && !state.unlockedStarColors.frost){ state.unlockedStarColors.frost=true; showToast(`🎅 Поймано 5 Дедов Морозов! Открыт эксклюзивный цвет звезды «Морозный иней»!`); }
 else showToast(`🎅 Дед Мороз пойман! +${SANTA_CONFIG.rewardSparks} 🔥, +${SANTA_CONFIG.rewardLights} огня и −30% на покупки за ⭐ на час!`);
+if(window.ElkaBackend && typeof window.ElkaBackend.logEvent==='function') window.ElkaBackend.logEvent('santa_caught',{total});
 markDirty(); refreshGiftPrices(); syncUI();
 }
 
@@ -614,7 +616,7 @@ const groundGlowR=Math.max(65,baseRadius*1.95*scale);
 const gGrad=ctx.createRadialGradient(cx,groundY+4,4,cx,groundY+4,groundGlowR);
 const litStrength=(0.06+LIGHT_CONFIG.treeLit*0.28)*Math.min(1,LIGHT_CONFIG.count/24);
 gGrad.addColorStop(0,`rgba(${pal[0].glow}, ${litStrength.toFixed(3)})`);
-gGrad.addColorStop(1,"rgba(14, 26, 46, 0)");
+grad.addColorStop(1,"rgba(14, 26, 46, 0)");
 ctx.fillStyle=gGrad;
 ctx.beginPath(); ctx.ellipse(cx,groundY+4,groundGlowR,groundGlowR*0.28,0,0,Math.PI*2); ctx.fill();
 const drawList=[];
@@ -787,6 +789,7 @@ if(toShow.type==="sparks"){
 if(state.sparks<toShow.cost){ showToast(`Не хватает Искр: нужно ${toShow.cost} 🔥`,true); return; }
 state.sparks-=toShow.cost; markDirty();
 showToast(`⭐ Установлена звезда: «${toShow.title}»!`,true);
+if(window.ElkaBackend && typeof window.ElkaBackend.logEvent==='function') window.ElkaBackend.logEvent('star_upgraded',{level:toShow.lvl});
 revealStar(toShow.lvl,null);
 } else {
 const cost=discountedStars(toShow.cost);
@@ -796,7 +799,7 @@ showConfirm({
 title:`${topStarSvg(18,"#f5b82e")} ${toShow.title}`,
 desc:`${toShow.desc}\nУровень звезды останется навсегда.`,
 price:confPrice, okText:"Купить",
-onOk:()=>{ showToast(`⭐ Установлена звезда: «${toShow.title}» (демо, ${cost} ⭐)!`,true); revealStar(toShow.lvl,null); },
+onOk:()=>{ showToast(`⭐ Установлена звезда: «${toShow.title}» (демо, ${cost} ⭐)!`,true); if(window.ElkaBackend && typeof window.ElkaBackend.logEvent==='function') window.ElkaBackend.logEvent('star_upgraded',{level:toShow.lvl}); revealStar(toShow.lvl,null); },
 onCancel:()=>{}
 });
 }
@@ -844,6 +847,7 @@ if(state.sparks<p.cost){ showToast(`Не хватает Искр: нужно ${p
 state.sparks-=p.cost; state.unlockedPalettes[key]=true; markDirty();
 }
 LIGHT_CONFIG.palette=key; markDirty(); syncUI();
+if(window.ElkaBackend && typeof window.ElkaBackend.logEvent==='function') window.ElkaBackend.logEvent('palette_bought',{palette:key});
 showToast(`💡 Включена гирлянда «${p.name}»`,true);
 });
 palGrid.appendChild(btn);
@@ -899,6 +903,7 @@ state.groundGifts.push({kind:g.kind,icon:g.icon,label:g.label,from:"Вы (Гос
 markDirty();
 spawnBurst(lastBaseScreen.x,lastBaseScreen.y-30,330);
 spawnBurst(lastBaseScreen.x,lastBaseScreen.y-10,48);
+if(window.ElkaBackend && typeof window.ElkaBackend.logEvent==='function') window.ElkaBackend.logEvent('gift_placed',{kind:g.kind});
 showToast(`🎁 Подарок «${g.label}» (${eff0} ⭐) поставлен (демо)!`,true);
 },
 onCancel:()=>{}
@@ -932,7 +937,7 @@ function getFriendsTrees(){
 const visited=loadVisitedTrees()||[];
 const byOwner=new Map();
 DEMO_FRIENDS.forEach(t=>byOwner.set(t.owner,{...t}));
-visited.forEach(v=>{ const base=byOwner.get(v.owner)||{}; byOwner.set(v.owner,{...base,...v}); });
+visited.forEach(v=>{ const base=byOwner.get(v.owner)||" "; byOwner.set(v.owner,{...base,...v}); });
 const arr=Array.from(byOwner.values());
 arr.sort((a,b)=>(b.lastVisit||0)-(a.lastVisit||0));
 return arr;
@@ -987,7 +992,8 @@ spawnBurst(W*0.5,H*0.4,280);
 spawnBurst(W*0.5,H*0.45,48);
 showToast(`⭐ Вы подарили «${starDef.title}» — ${t.name}! (демо, ${cost} ⭐)`,true);
 },
-onCancel:()=>{}
+onCancel:()=>{
+}
 });
 });
 box.appendChild(card);
@@ -1069,16 +1075,21 @@ if(state.streakCount===3){ bonus+=100; msg="🔥 Стрик 3 дня подря�
 if(state.streakCount===7){ bonus+=250; msg="🔥 Стрик 7 дней подряд! +50 🔥 и бонус +250 🔥!"; }
 state.sparks+=bonus;
 state.dailyLastDate=today;
+if(window.ElkaBackend && typeof window.ElkaBackend.logEvent==='function') window.ElkaBackend.logEvent('daily_claim',{streak:state.streakCount});
 markDirty(); syncUI();
 showToast(msg,true);
 });
 document.getElementById("btnTabStar").addEventListener("click",()=>toggleSheet("sheetStar"));
 document.getElementById("btnTabGarland").addEventListener("click",()=>toggleSheet("sheetGarland"));
 document.getElementById("btnTabFriends").addEventListener("click",()=>{ renderFriendsCarousel(); toggleSheet("sheetFriends"); });
-document.getElementById("btnOpenShare").addEventListener("click",()=>toggleSheet("sheetShare"));
+document.getElementById("btnOpenShare").addEventListener("click",()=>{
+if(window.ElkaBackend && typeof window.ElkaBackend.logEvent==='function') window.ElkaBackend.logEvent('share_copied',{});
+toggleSheet("sheetShare");
+});
 document.getElementById("btnOpenGiftShop").addEventListener("click",()=>toggleSheet("sheetGifts"));
 document.getElementById("btnCopyBio").addEventListener("click",()=>{
 const txt=document.getElementById("bioText").textContent.trim();
+if(window.ElkaBackend && typeof window.ElkaBackend.logEvent==='function') window.ElkaBackend.logEvent('share_copied',{text:txt});
 if(window.ElkaBackend && typeof window.ElkaBackend.copyText==='function'){
 window.ElkaBackend.copyText(txt).then(ok=>showToast(ok?"📋 Скопировано! Вставьте в Bio.":"Не удалось скопировать",true));
 } else if(navigator.clipboard) navigator.clipboard.writeText(txt).then(()=>showToast("📋 Скопировано! Вставьте в Bio.",true)).catch(()=>{});
