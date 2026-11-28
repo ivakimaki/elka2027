@@ -480,9 +480,11 @@ const USE_BACKEND = true;
 через `Object.assign(window.ElkaClientHooks, {...})` (см. раздел 3.3), иначе снапшот с
 сервера не применится.
 
-**Задача 7 — проверка под ключ.**
-Ключ `sb_publishable_...` подставляется в заголовок `apikey`. Убедиться, что
-`createSupabaseClient()` шлёт и `apikey`, и (после `tg-auth`) `Authorization: Bearer <jwt>`.
+**Задача 7 — проверка под ключ (✅ решено в v15.1).**
+Ключ `sb_publishable_...` передаётся только в заголовок `apikey` (без `Authorization: Bearer sb_publishable_...`).
+После получения `access_token` от `tg-auth` клиент пересоздаётся через `createSupabaseClient(accessToken)` с явным
+`global.headers.Authorization = 'Bearer ' + accessToken`, чтобы все PostgREST-запросы и Edge Functions гарантированно шли с JWT.
+Событие `app_open` логируется только сервером в `tg-auth` (без дубля на клиенте), а `APP_VERSION` выводится в правом верхнем углу панелей `debug.js`.
 
 ---
 

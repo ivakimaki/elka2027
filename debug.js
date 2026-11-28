@@ -3,6 +3,7 @@ DEBUG PANEL + DIAG v4 (с реальным initData + перехватом ло�
 Опциональный файл: если не подключён в index.html — ничего не ломается.
 ============================================================ */
 (function(){
+  var APP_VERSION = (typeof window.APP_VERSION !== 'undefined' && window.APP_VERSION) ? String(window.APP_VERSION) : 'v15.1';
   // === Перехват console.* в буфер ===
   var logBuffer = [];
   var MAX_LOG_LINES = 30;
@@ -40,7 +41,7 @@ DEBUG PANEL + DIAG v4 (с реальным initData + перехватом ло�
     var p=document.createElement("div");
     p.id="__debugPanel";
     p.style.cssText='position:fixed;top:12px;right:12px;background:rgba(10,16,28,0.97);border:1px solid rgba(250,204,21,0.5);border-radius:14px;padding:10px;z-index:99999;display:none;flex-direction:column;gap:6px;max-width:220px;font-family:-apple-system,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,0.7);';
-    p.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><span style="font-size:12px;font-weight:700;color:#fde68a;">🐞 DEBUG</span><button id="__dbgClose" style="background:rgba(255,255,255,0.1);border:none;color:#cbd5e1;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:12px;">✕</button></div>'+
+    p.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;gap:6px;"><span style="font-size:12px;font-weight:700;color:#fde68a;">🐞 DEBUG</span><span style="font-size:10px;color:#94a3b8;margin-left:auto;">'+APP_VERSION+'</span><button id="__dbgClose" style="background:rgba(255,255,255,0.1);border:none;color:#cbd5e1;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:12px;">✕</button></div>'+
     '<button data-act="santa" style="padding:8px;border-radius:8px;border:none;background:linear-gradient(135deg,#dc2626,#991b1b);color:#fff;font-weight:600;font-size:12px;cursor:pointer;">🎅 Запустить Деда Мороза</button>'+
     '<button data-act="catch" style="padding:8px;border-radius:8px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;font-weight:600;font-size:12px;cursor:pointer;">✋ Поймать сразу</button>'+
     '<button data-act="discount" style="padding:8px;border-radius:8px;border:none;background:linear-gradient(135deg,#d97706,#b45309);color:#fff;font-weight:600;font-size:12px;cursor:pointer;">🏷 Скидка −30% на час</button>'+
@@ -90,7 +91,7 @@ DEBUG PANEL + DIAG v4 (с реальным initData + перехватом ло�
   // === Диагностическая панель (с реальным initData + копированием) ===
   function collectDiag(){
     var L=[];
-    L.push('=== ДИАГНОСТИКА ===');
+    L.push('=== ДИАГНОСТИКА ('+APP_VERSION+') ===');
     L.push('URL: '+location.href.slice(0,70));
     var tg=window.Telegram&&window.Telegram.WebApp;
     L.push('Telegram.WebApp: '+(tg?'есть':'НЕТ'));
@@ -174,9 +175,14 @@ DEBUG PANEL + DIAG v4 (с реальным initData + перехватом ло�
       window.__elkaTestResult=out.join('\n'); showPanel();
     });
   }
+  function renderDiagPanelText(p){
+    var pre=p.querySelector('#__diagPre');
+    if(pre) pre.textContent=collectDiag();
+    else p.textContent=collectDiag();
+  }
   function showPanel(){
     var p=document.getElementById('__diagPanel');
-    if(p){ p.textContent=collectDiag(); p.style.display='block'; }
+    if(p){ renderDiagPanelText(p); p.style.display='block'; }
   }
   window.addEventListener('elka:backend-offline',function(e){
     window.__elkaOfflineReason=(e.detail&&e.detail.reason)||'unknown';
@@ -197,11 +203,12 @@ DEBUG PANEL + DIAG v4 (с реальным initData + перехватом ло�
     var bTest=mk('🧪','rgba(90,40,140,.92)');
     wrap.appendChild(bTest);wrap.appendChild(bCopy);wrap.appendChild(bMain);
     document.body.appendChild(wrap);
-    var panel=document.createElement('pre');
+    var panel=document.createElement('div');
     panel.id='__diagPanel';
-    panel.style.cssText='position:fixed;bottom:170px;right:14px;z-index:99998;max-width:320px;background:rgba(10,16,28,.98);border:1px solid rgba(250,204,21,.5);border-radius:12px;padding:10px;font-size:11px;line-height:1.4;color:#e2e8f0;display:none;white-space:pre-wrap;word-break:break-word;font-family:monospace;max-height:62vh;overflow-y:auto;margin:0;user-select:text;-webkit-user-select:text;';
+    panel.style.cssText='position:fixed;bottom:170px;right:14px;z-index:99998;max-width:320px;min-width:240px;background:rgba(10,16,28,.98);border:1px solid rgba(250,204,21,.5);border-radius:12px;padding:10px;font-size:11px;line-height:1.4;color:#e2e8f0;display:none;font-family:monospace;max-height:62vh;overflow-y:auto;margin:0;user-select:text;-webkit-user-select:text;';
+    panel.innerHTML='<span style="position:sticky;top:0;float:right;font-size:10px;color:#94a3b8;background:rgba(10,16,28,.92);padding:0 4px;border-radius:4px;margin-left:6px;">'+APP_VERSION+'</span><pre id="__diagPre" style="margin:0;white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:inherit;line-height:inherit;"></pre>';
     document.body.appendChild(panel);
-    bMain.onclick=function(){ panel.textContent=collectDiag(); panel.style.display=panel.style.display==='none'?'block':'none'; };
+    bMain.onclick=function(){ renderDiagPanelText(panel); panel.style.display=panel.style.display==='none'?'block':'none'; };
     bCopy.onclick=copyDiag;
     bTest.onclick=testTgAuth;
     if(window.__elkaOfflineReason) showPanel();

@@ -26,7 +26,7 @@ const CONFIG = {
 };
 
 let sb = null, accessToken = null, currentUserId = null, currentUserRow = null, lastServerSnapshot = null;
-let saveTimer = null, initialized = false, flushHooksInstalled = false;
+let saveTimer = null, initialized = false, initPromise = null, flushHooksInstalled = false;
 
 const hooks = window.ElkaClientHooks = window.ElkaClientHooks || {};
 
@@ -41,15 +41,20 @@ function cloneJson(v){ return JSON.parse(JSON.stringify(v)); }
 function isSame(a,b){ return JSON.stringify(a)===JSON.stringify(b); }
 function dispatch(name,detail){ window.dispatchEvent(new CustomEvent(name,{detail})); }
 
+function decodeJwtPayload(token){
+  try{
+    const parts = String(token||'').split('.');
+    if(parts.length < 2) return null;
+    const b64 = parts[1].replace(/-/g,'+').replace(/_/g,'/');
+    const json = decodeURIComponent(atob(b64).split('').map(c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+    return JSON.parse(json);
+  }catch(_){ return null; }
+}
+
 function createSupabaseClient(token){
-  const options = { auth:{ persistSession:false, autoRefreshToken:false, detectSessionInUrl:false }, global:{ headers:{} } };
+  const options = { auth:{ persistSession:false, autoRefreshToken:false, detectSessionInUrl:false }, global:{ headers:{ apikey: CONFIG.SUPABASE_ANON_KEY } } };
   if(token){
     options.global.headers.Authorization = 'Bearer '+token;
-    options.global.headers.apikey = CONFIG.SUPABASE_ANON_KEY;
-    options.accessToken = async function(){ return token; };
-  } else {
-    options.global.headers.apikey = CONFIG.SUPABASE_ANON_KEY;
-    options.global.headers.Authorization = 'Bearer '+CONFIG.SUPABASE_ANON_KEY;
   }
   return supabaseLib.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, options);
 }
@@ -97,6 +102,7 @@ function rowToSnapshot(row, gifts){
     lightsCount: row.lights_count ?? 4,
     waterDay: row.water_day || null,
     waterCount: row.water_count ?? 0,
+    waterCdEnd: row.water_cd_end || null,
     liveWaterDay: row.live_water_day || null,
     liveWaterCount: row.live_water_count ?? 0,
     visitDay: lo.visitDay || null,
@@ -122,6 +128,7 @@ function rowToPatch(row){
   if(row.lights_count!==undefined) p.lightsCount=row.lights_count;
   if(row.water_day!==undefined) p.waterDay=row.water_day;
   if(row.water_count!==undefined) p.waterCount=row.water_count;
+  if(row.water_cd_end!==undefined) p.waterCdEnd=row.water_cd_end;
   if(row.live_water_day!==undefined) p.liveWaterDay=row.live_water_day;
   if(row.live_water_count!==undefined) p.liveWaterCount=row.live_water_count;
   if(row.daily_last_date!==undefined) p.dailyLastDate=row.daily_last_date;
@@ -182,13 +189,16 @@ function applyPatch(patch, meta){
 }
 
 const ALLOWED_EVENTS = new Set([
-  'app_open','water','live_water','visit','daily_claim','santa_caught',
+  'water','live_water','visit','daily_claim','santa_caught',
   'gift_placed','gift_tapped','share_copied','invoice_paid',
   'star_upgraded','palette_bought','star_color_bought','star_gift_sent'
 ]);
 const pendingEvents = [];
 
 function trackEvent(eventName, payload){
+  if(eventName === 'app_open'){
+    return false;
+  }
   if(!ALLOWED_EVENTS.has(eventName)){
     warn('Unknown event ignored:', eventName);
     return false;
@@ -269,10 +279,24 @@ const SupabaseAdapter = {
   async load(){
     if(!currentUserId) return null;
     const { data:row, error:ue } = await sb.from('users').select('*').eq('tg_id',currentUserId).maybeSingle();
-    if(ue) throw ue;
-    if(!row) throw new Error('User row not found');
+    if(ue){
+      const reason = 'users select error: code='+(ue.code||'none')+' msg='+(ue.message||'')+' details='+(ue.details||'')+' hint='+(ue.hint||'');
+      errorLog(reason, { tg_id: currentUserId, hasToken: !!accessToken });
+      throw new Error(reason);
+    }
+    if(!row){
+      const jwt = decodeJwtPayload(accessToken);
+      const jwtTgId = jwt && jwt.user_metadata ? jwt.user_metadata.tg_id : null;
+      const jwtRole = jwt ? jwt.role : null;
+      const reason = 'User row not found (tg_id='+currentUserId+', jwt_tg_id='+String(jwtTgId||'MISSING')+', role='+String(jwtRole||'none')+', token='+(accessToken?'present':'missing')+' — проверьте RLS/user_metadata)';
+      errorLog(reason);
+      throw new Error(reason);
+    }
     const { data:gifts, error:ge } = await sb.from('gifts').select('id,kind,message,donor_id,created_at,price_paid').eq('owner_id',currentUserId).order('created_at',{ascending:true});
-    if(ge) throw ge;
+    if(ge){
+      errorLog('gifts select error:', ge);
+      throw ge;
+    }
     const enrichedGifts = await attachDonorNames(gifts || []);
     currentUserRow = row;
     const snap = rowToSnapshot(row, enrichedGifts);
@@ -294,37 +318,42 @@ const SupabaseAdapter = {
 
 async function init(){
   if(initialized) return { ok:true, userId:currentUserId, user:currentUserRow };
-  sb = createSupabaseClient(null);
-  const tg = getTg();
-  if(!tg){ warn('Telegram.WebApp not found'); dispatch('elka:backend-offline',{reason:'no_telegram'}); return { ok:false, reason:'no_telegram' }; }
-  try{ tg.ready(); tg.expand(); }catch(_){}
-  const initData = tg.initData;
-  if(!initData){ warn('initData empty'); dispatch('elka:backend-offline',{reason:'empty_init_data'}); return { ok:false, reason:'empty_init_data' }; }
-  try{
-    log('tg-auth start');
-    const auth = await invokeFn('tg-auth',{initData});
-    if(!auth || !auth.access_token || !auth.user) throw new Error('Invalid tg-auth response');
-    accessToken = auth.access_token;
-    currentUserId = String(auth.user.tg_id || auth.user.id);
-    if(auth.refresh_token){
-      const { error } = await sb.auth.setSession({ access_token:auth.access_token, refresh_token:auth.refresh_token });
-      if(error) throw error;
-    } else {
+  if(initPromise) return initPromise;
+  initPromise = (async()=>{
+    sb = createSupabaseClient(null);
+    const tg = getTg();
+    if(!tg){ warn('Telegram.WebApp not found'); dispatch('elka:backend-offline',{reason:'no_telegram'}); return { ok:false, reason:'no_telegram' }; }
+    try{ tg.ready(); tg.expand(); }catch(_){}
+    const initData = tg.initData;
+    if(!initData){ warn('initData empty'); dispatch('elka:backend-offline',{reason:'empty_init_data'}); return { ok:false, reason:'empty_init_data' }; }
+    try{
+      log('tg-auth start');
+      const auth = await invokeFn('tg-auth',{initData});
+      if(!auth || !auth.access_token || !auth.user) throw new Error('Invalid tg-auth response');
+      accessToken = auth.access_token;
+      currentUserId = String(auth.user.tg_id || auth.user.id);
       sb = createSupabaseClient(accessToken);
+      if(auth.refresh_token){
+        const { error: sessErr } = await sb.auth.setSession({ access_token:auth.access_token, refresh_token:auth.refresh_token });
+        if(sessErr) warn('setSession warning (using Bearer header):', sessErr.message || sessErr);
+      }
+      log('tg-auth ok',{ userId:currentUserId, isNew:auth.isNew });
+      const snap = await SupabaseAdapter.load();
+      applySnapshot(snap,{ source:'backend:init', isNew:!!auth.isNew });
+      installFlushHooks();
+      initialized = true;
+      dispatch('elka:backend-ready',{ userId:currentUserId, user:currentUserRow, isNew:!!auth.isNew });
+      if(CONFIG.AUTO_VISIT_FROM_START_PARAM) autoVisitFromStartParam().catch(e=>warn('auto visit failed',e));
+      return { ok:true, userId:currentUserId, user:currentUserRow, isNew:!!auth.isNew };
+    }catch(err){
+      errorLog('init failed, fallback to localStorage',err);
+      dispatch('elka:backend-offline',{ reason:'init_failed', error:String(err.message||err) });
+      return { ok:false, reason:'init_failed', error:err };
+    }finally{
+      initPromise = null;
     }
-    log('tg-auth ok',{ userId:currentUserId, isNew:auth.isNew });
-    const snap = await SupabaseAdapter.load();
-    applySnapshot(snap,{ source:'backend:init', isNew:!!auth.isNew });
-    installFlushHooks();
-    initialized = true;
-    dispatch('elka:backend-ready',{ userId:currentUserId, user:currentUserRow, isNew:!!auth.isNew });
-    if(CONFIG.AUTO_VISIT_FROM_START_PARAM) autoVisitFromStartParam().catch(e=>warn('auto visit failed',e));
-    return { ok:true, userId:currentUserId, user:currentUserRow, isNew:!!auth.isNew };
-  }catch(err){
-    errorLog('init failed, fallback to localStorage',err);
-    dispatch('elka:backend-offline',{ reason:'init_failed', error:String(err.message||err) });
-    return { ok:false, reason:'init_failed', error:err };
-  }
+  })();
+  return initPromise;
 }
 
 function queueSave(){

@@ -180,6 +180,7 @@ for(const k in data.unlockedStarColors) if(STAR_COLORS[k] && data.unlockedStarCo
 }
 if(data.waterDay!==undefined) state.waterDay=data.waterDay||"";
 if(data.waterCount!==undefined) state.waterCount=Number(data.waterCount)||0;
+if(data.waterCdEnd!==undefined) state.waterCdEnd=parseTs(data.waterCdEnd);
 if(data.liveWaterDay!==undefined) state.liveWaterDay=data.liveWaterDay||"";
 if(data.liveWaterCount!==undefined) state.liveWaterCount=Number(data.liveWaterCount)||0;
 if(data.dailyLastDate!==undefined) state.dailyLastDate=data.dailyLastDate||"";
