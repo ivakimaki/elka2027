@@ -1,5 +1,5 @@
 /* ============================================================
-SUPABASE BACKEND ADAPTER — v15.1
+SUPABASE BACKEND ADAPTER — v15.2
 ============================================================ */
 (function(){
 'use strict';
@@ -211,7 +211,7 @@ const SupabaseAdapter = {
 };
 
 async function init(){
-  if(initialized) return { ok:true, userId:currentUserId, user:currentUserRow };
+  if(initialized) return { ok:true, userId:currentUserId, user:currentUserRow, isNew:false };
   sb = createSupabaseClient(null);
   const tg = getTg();
   if(!tg){ warn('Telegram.WebApp not found'); dispatch('elka:backend-offline',{reason:'no_telegram'}); return { ok:false, reason:'no_telegram' }; }
@@ -224,13 +224,14 @@ async function init(){
     if(!auth || !auth.access_token || !auth.user) throw new Error('Invalid tg-auth response');
     accessToken = auth.access_token;
     currentUserId = String(auth.user.tg_id || auth.user.id);
+    currentUserRow = auth.user;
     if(auth.refresh_token){
       const { error } = await sb.auth.setSession({ access_token:auth.access_token, refresh_token:auth.refresh_token });
       if(error) throw error;
     } else {
       sb = createSupabaseClient(accessToken);
     }
-    log('tg-auth ok',{ userId:currentUserId, isNew:auth.isNew });
+    log('tg-auth ok',{ userId:currentUserId, isNew:!!auth.isNew });
     const snap = await SupabaseAdapter.load();
     applySnapshot(snap,{ source:'backend:init', isNew:!!auth.isNew });
     installFlushHooks();
