@@ -1,5 +1,5 @@
 /* ============================================================
-SUPABASE BACKEND ADAPTER — v15.0
+SUPABASE BACKEND ADAPTER — v15.1
 ============================================================ */
 (function(){
 'use strict';
@@ -184,9 +184,13 @@ function applyPatch(patch, meta){
 const SupabaseAdapter = {
   async load(){
     if(!currentUserId) return null;
-    const { data:row, error:ue } = await sb.from('users').select('*').eq('tg_id',currentUserId).single();
+    const { data:row, error:ue } = await sb.from('users').select('*').eq('tg_id', String(currentUserId)).maybeSingle();
     if(ue) throw ue;
-    const { data:gifts, error:ge } = await sb.from('gifts').select('id,kind,message,donor_id,created_at,price_paid').eq('owner_id',currentUserId).order('created_at',{ascending:true});
+    if(!row){
+      warn('User row not found for tg_id:', currentUserId);
+      return null;
+    }
+    const { data:gifts, error:ge } = await sb.from('gifts').select('id,kind,message,donor_id,created_at,price_paid').eq('owner_id', String(currentUserId)).order('created_at',{ascending:true});
     if(ge) throw ge;
     currentUserRow = row;
     const snap = rowToSnapshot(row, gifts||[]);
@@ -200,7 +204,7 @@ const SupabaseAdapter = {
     const update = snapshotDiffToDbUpdate(diff);
     if(Object.keys(update).length===0){ log('save: no server-writable fields'); return; }
     update.last_seen = nowIso();
-    const { error } = await sb.from('users').update(update).eq('tg_id',currentUserId);
+    const { error } = await sb.from('users').update(update).eq('tg_id', String(currentUserId));
     if(error) throw error;
     log('save ok',update);
   },
@@ -277,7 +281,7 @@ async function parseOwnerIdFromStartParam(sp){
   if(!sp) return null;
   if(/^\d+$/.test(sp)) return sp;
   if(/^[a-zA-Z0-9]{4,10}$/.test(sp)){
-    const { data, error } = await sb.from('users').select('tg_id').eq('invite_code', sp).single();
+    const { data, error } = await sb.from('users').select('tg_id').eq('invite_code', sp).maybeSingle();
     if(error || !data){ warn('Invite code not found:', sp); return null; }
     return data.tg_id;
   }
@@ -378,7 +382,7 @@ async function buyLiveWater(){
 
 async function getDonorIds(){
   if(!initialized || !currentUserId) return [];
-  const { data,error } = await sb.from('gifts').select('donor_id').eq('owner_id',currentUserId);
+  const { data,error } = await sb.from('gifts').select('donor_id').eq('owner_id', String(currentUserId));
   if(error) throw error;
   return Array.from(new Set((data||[]).map(x=>x.donor_id).filter(Boolean)));
 }

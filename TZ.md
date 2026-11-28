@@ -78,23 +78,4 @@ elka2027/
 ### 3.2 Порядок загрузки в `index.html`
 ```html
 <head>
-  <link rel="stylesheet" href="styles.css">
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script>
-    const SUPABASE_URL = 'https://mrhomyamfrqbxeazrtzm.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_OvCWw_CiJz9n0pj83aIyTA_bAh5Hj73';
-    const USE_BACKEND = true;
-  </script>
-  <script src="backend.js"></script>
-</head>
-```
-
-### 3.3 Контракт клиент ↔ бэкенд (хуки)
-`backend.js` обращается к игре через `window.ElkaClientHooks`.
-
-### 3.4 Публичное API `window.ElkaBackend`
-init(), load(), save(diff), queueSave(), flushSave(), water(), visit(ownerId), buyGift(...), buyStarLevel(...), buyStarGift(...), buyLiveWater(), createInvoice(...), openInvoice(...), getTreesPreview(...), getFriendsCarousel(...), getMyShareLink(), copyText(...), getState(), reload().
-
-### 3.5 Инвайт-ссылка
-Поддерживается короткий `invite_code` для шаринга.
+  <link rel=
